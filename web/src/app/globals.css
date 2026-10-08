@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #faf7f2;
+  --card: #ffffff;
+  --ink: #1f1b16;
+  --muted: #6b6359;
+  --line: #e6dfd4;
+  --accent: #9a3412;
+  --accent-soft: #fbeee6;
+  --danger: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15130f;
+    --card: #1d1a15;
+    --ink: #ece6dc;
+    --muted: #a39a8c;
+    --line: #322d25;
+    --accent: #f0915f;
+    --accent-soft: #2c1d14;
+    --danger: #f87171;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-literata);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-card px-3 py-1.5 text-sm font-medium transition hover:border-muted disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-paper hover:opacity-90;
+  }
+  .input {
+    @apply w-full rounded-md border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent;
+  }
+  .card {
+    @apply rounded-lg border border-line bg-card;
+  }
+  .quote-text {
+    @apply font-serif text-[1.05rem] leading-relaxed;
+  }
+}
