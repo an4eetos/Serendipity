@@ -11,11 +11,34 @@ Product spec and copyright model: [docs/PRODUCT.md](docs/PRODUCT.md).
 ## Layout
 
 ```
-api/        Go API — chi, pgx, Anthropic Go SDK
+backend/    Go API — chi, pgx, Uber Fx, Anthropic Go SDK
 web/        Next.js (App Router, TypeScript, Tailwind)
 supabase/   local Supabase config, migrations, seed (preset characters)
 docs/       product spec
 ```
+
+The backend is organized by business capability (rules in
+[.claude/rules/go](.claude/rules/go)):
+
+```
+backend/
+  cmd/server/     main: bootstraps the Fx app
+  infra/          config, database, HTTP server; one Fx module per bounded context
+  internal/
+    kernel/       shared kernel: DomainError, TxManager, Postgres + HTTP plumbing
+    identity/     Supabase access tokens, auth middleware
+    catalog/      works and Open Library search
+    library/      a reader's books, progress, private files
+    quote/        quotes and the publishing rules
+    discussion/   characters, conversations, quote pages
+    kindleimport/ My Clippings.txt import
+    profile/      profiles and the public profile page
+```
+
+Each bounded context has `domain/` (pure rules, standard library only),
+`ports/` (interfaces), `usecase/` (one business action each, writes inside
+the TxManager) and `adapters/` (`handlers` and `converters` for HTTP;
+`postgres`, `openlibrary`, `supabase`, `anthropic` for the outside world).
 
 The web app talks to Supabase only for sign-in and for uploading books into the
 private `books` bucket; everything else goes through the Go API.
@@ -30,7 +53,7 @@ npx supabase start
 npx supabase status -o env   # local URLs and keys
 
 # 2. API on :8787
-cd api
+cd backend
 cp .env.example .env         # fill SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET, ANTHROPIC_API_KEY
 set -a; . ./.env; set +a
 go run ./cmd/server
@@ -50,8 +73,16 @@ Reset the database (re-run migrations and seed): `npx supabase db reset`.
 ## Tests
 
 ```sh
-cd api && go test ./...      # Kindle parser, quote rules, prompt building
+cd backend && go test ./...  # domain rules, usecases with fake ports, adapters
 cd web && npm run lint && npx tsc --noEmit
+```
+
+The Postgres adapter tests run against the local Supabase database and are
+skipped unless `TEST_DATABASE_URL` is set. Each test runs in a transaction that
+is rolled back, so it leaves no data behind:
+
+```sh
+cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres go test ./...
 ```
 
 ## API
