@@ -8,28 +8,18 @@ import (
 )
 
 func TestBuildSystem(t *testing.T) {
-	react := BuildSystem("Diogenes", "You are Diogenes.", ModeReact)
-	argue := BuildSystem("Diogenes", "You are Diogenes.", ModeArgue)
-
-	for _, s := range []string{react, argue} {
-		if !strings.HasPrefix(s, "You are Diogenes.") {
-			t.Errorf("system prompt should start with the persona prompt: %q", s[:40])
-		}
-		if !strings.Contains(s, "Stay in character as Diogenes") {
-			t.Error("shared rules should name the character")
-		}
-		if !strings.Contains(s, "Never quote more than a single sentence") {
-			t.Error("shared rules should include the copyright rule")
-		}
+	s := BuildSystem("Diogenes", "You are Diogenes.")
+	if !strings.HasPrefix(s, "You are Diogenes.") {
+		t.Errorf("system prompt should start with the persona prompt: %q", s[:40])
 	}
-	if !strings.Contains(react, "Mode: reaction") || strings.Contains(react, "Mode: argument") {
-		t.Error("react mode rules missing or mixed")
-	}
-	if !strings.Contains(argue, "Mode: argument") || strings.Contains(argue, "Mode: reaction") {
-		t.Error("argue mode rules missing or mixed")
-	}
-	if got := BuildSystem("X", "p", "bogus"); !strings.Contains(got, "Mode: reaction") {
-		t.Error("unknown mode should fall back to reaction")
+	for _, want := range []string{
+		"Stay in character as Diogenes",
+		"discuss their reaction",
+		"Never quote more than a single sentence",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("system prompt missing %q", want)
+		}
 	}
 }
 
@@ -39,28 +29,28 @@ func TestOpeningMessage(t *testing.T) {
 		Title:    "Apology",
 		Authors:  []string{"Plato"},
 		Location: "38a",
-		Note:     "Is that too harsh?",
+		Reaction: "Is that too harsh?",
 	}
 	got := OpeningMessage(p)
 	want := "<passage>\nThe unexamined life is not worth living.\n</passage>\n" +
 		"Source: Apology by Plato — 38a\n\n" +
-		"The reader's note:\nIs that too harsh?"
+		"My reaction:\nIs that too harsh?"
 	if got != want {
 		t.Errorf("OpeningMessage() =\n%s\nwant\n%s", got, want)
 	}
 
-	p.Note, p.Authors, p.Location = "", nil, ""
-	if got := OpeningMessage(p); !strings.HasSuffix(got, "Source: Apology\n\nThe reader added no note.") {
-		t.Errorf("OpeningMessage() without note/authors/location = %q", got)
+	p.Authors, p.Location = nil, ""
+	if got := OpeningMessage(p); !strings.Contains(got, "Source: Apology\n\nMy reaction:") {
+		t.Errorf("OpeningMessage() without authors/location = %q", got)
 	}
 }
 
 func TestBuildMessagesAlternates(t *testing.T) {
 	msgs := buildMessages(Request{
-		Passage: Passage{Text: "x", Title: "t"},
+		Passage: Passage{Text: "x", Title: "t", Reaction: "r"},
 		History: []Turn{
-			{Role: "assistant", Content: "reaction"},
-			{Role: "user", Content: "reply"},
+			{Role: "assistant", Content: "reply"},
+			{Role: "user", Content: "answer"},
 		},
 	})
 	wantRoles := []anthropic.BetaMessageParamRole{

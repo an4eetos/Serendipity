@@ -16,8 +16,8 @@ export function QuotePage({ id }: { id: string }) {
       </button>
       <QuoteWorkspace quoteId={id} onDeleted={() => router.push("/library")} />
       <p className="text-xs text-muted">
-        Public quotes appear on your <Link href="/library" className="underline">profile</Link> with your note and these
-        conversations.
+        Public quotes appear on your <Link href="/library" className="underline">profile</Link> with your reaction and these
+        discussions.
       </p>
     </div>
   );

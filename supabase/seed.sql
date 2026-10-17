@@ -1,5 +1,5 @@
 -- Preset characters. Only the voice and worldview live here; the shared rules
--- (react, don't summarize; stay brief; never reproduce the source) are added
+-- (discuss the reader's reaction; stay brief; never reproduce the source) are added
 -- by the API in api/internal/llm/prompt.go so they apply to every persona.
 
 insert into public.personas (slug, name, era, short_bio, system_prompt, is_preset, sort_order) values

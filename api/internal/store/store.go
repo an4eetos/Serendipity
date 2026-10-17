@@ -80,7 +80,7 @@ type Quote struct {
 	Location      string    `json:"location"`
 	Anchor        *string   `json:"anchor"`
 	Position      *float64  `json:"position"`
-	Note          string    `json:"note"`
+	Reaction      string    `json:"reaction"`
 	Source        string    `json:"source"`
 	Visibility    string    `json:"visibility"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -101,7 +101,6 @@ type Persona struct {
 type Conversation struct {
 	ID        string    `json:"id"`
 	QuoteID   string    `json:"quote_id"`
-	Mode      string    `json:"mode"`
 	Persona   Persona   `json:"persona"`
 	Messages  []Message `json:"messages"`
 	CreatedAt time.Time `json:"created_at"`

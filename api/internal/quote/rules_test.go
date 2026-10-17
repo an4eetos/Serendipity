@@ -28,18 +28,18 @@ func TestValidateText(t *testing.T) {
 
 func TestValidatePublic(t *testing.T) {
 	tests := []struct {
-		name                 string
-		text, note, location string
-		want                 error
+		name                     string
+		text, reaction, location string
+		want                     error
 	}{
 		{"ok", "To be or not to be", "My take", "Act 3", nil},
-		{"no note", "To be or not to be", "  ", "Act 3", ErrNoteRequired},
+		{"no reaction", "To be or not to be", "  ", "Act 3", ErrReactionRequired},
 		{"no location", "To be or not to be", "My take", "", ErrCitationMissing},
 		{"too long", strings.Repeat("w ", MaxWords+1), "My take", "Act 3", ErrTooLong},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ValidatePublic(tt.text, tt.note, tt.location); !errors.Is(got, tt.want) {
+			if got := ValidatePublic(tt.text, tt.reaction, tt.location); !errors.Is(got, tt.want) {
 				t.Errorf("ValidatePublic() = %v, want %v", got, tt.want)
 			}
 		})

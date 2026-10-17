@@ -75,13 +75,13 @@ export function ProfileView({ data, preview = false }: { data: PublicProfile; pr
               </p>
             </blockquote>
             <div>
-              <p className="text-xs font-medium text-muted">{profile.display_name || profile.username} wrote</p>
-              <p className="mt-1 whitespace-pre-wrap">{q.note}</p>
+              <p className="text-xs font-medium text-muted">{profile.display_name || profile.username}&apos;s reaction</p>
+              <p className="mt-1 whitespace-pre-wrap">{q.reaction}</p>
             </div>
             {q.conversations.map((c) => (
               <details key={c.id} className="rounded-md border border-line px-3 py-2">
                 <summary className="cursor-pointer text-sm">
-                  {c.mode === "argue" ? "Argued with" : "Reaction from"} <strong>{c.persona.name}</strong>
+                  Discussed with <strong>{c.persona.name}</strong>
                   <span className="text-muted"> · {c.messages.length} message{c.messages.length === 1 ? "" : "s"}</span>
                 </summary>
                 <div className="mt-3 space-y-3">

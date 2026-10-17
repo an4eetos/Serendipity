@@ -27,10 +27,9 @@ func New(model string) *Client {
 type Request struct {
 	PersonaName   string
 	PersonaPrompt string
-	Mode          string
 	Passage       Passage
 	// History holds the stored turns, starting with the character's first
-	// reaction and ending with the reader's latest message (if any).
+	// reply and ending with the reader's latest message (if any).
 	History []Turn
 }
 
@@ -63,7 +62,7 @@ func (c *Client) Stream(ctx context.Context, req Request, onText func(string) er
 	params := anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: 4096,
-		System:    []anthropic.BetaTextBlockParam{{Text: BuildSystem(req.PersonaName, req.PersonaPrompt, req.Mode)}},
+		System:    []anthropic.BetaTextBlockParam{{Text: BuildSystem(req.PersonaName, req.PersonaPrompt)}},
 		Messages:  buildMessages(req),
 		// Short conversational replies: low effort keeps them quick.
 		OutputConfig: anthropic.BetaOutputConfigParam{Effort: anthropic.BetaOutputConfigEffortLow},

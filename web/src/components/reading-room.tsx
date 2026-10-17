@@ -25,6 +25,8 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
   const [activeQuote, setActiveQuote] = useState<string>();
   const [jumpTo, setJumpTo] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // Kept apart from the selection so a stray click in the book doesn't lose it.
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     if (!session) return;
@@ -61,10 +63,11 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
     if (!selection || !item) return;
     setSaving(true);
     try {
-      const q = await post<Quote>("/quotes", { library_item_id: item.id, ...selection });
+      const q = await post<Quote>("/quotes", { library_item_id: item.id, ...selection, reaction: draft.trim() });
       setQuotes((prev) => [...prev.filter((x) => x.id !== q.id), q].sort(byPosition));
       setActiveQuote(q.id);
       setSelection(null);
+      setDraft("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -123,14 +126,23 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
               {words > MAX_WORDS ? (
                 <p className="text-sm text-danger">Quotes are limited to {MAX_WORDS} words — select a shorter passage.</p>
               ) : (
-                <div className="flex gap-2">
-                  <button className="btn btn-primary" disabled={saving} onClick={saveSelection}>
-                    Quote this
-                  </button>
-                  <button className="btn" onClick={() => setSelection(null)}>
-                    Cancel
-                  </button>
-                </div>
+                <>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={3}
+                    placeholder="Your reaction — what does this make you think?"
+                    className="input resize-y"
+                  />
+                  <div className="flex gap-2">
+                    <button className="btn btn-primary" disabled={saving} onClick={saveSelection}>
+                      {draft.trim() ? "Save quote + reaction" : "Quote this"}
+                    </button>
+                    <button className="btn" onClick={() => setSelection(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -184,6 +196,11 @@ function QuoteList({ quotes, onOpen }: { quotes: Quote[]; onOpen: (q: Quote) => 
         <li key={q.id}>
           <button onClick={() => onOpen(q)} className="card block w-full p-3 text-left hover:border-muted">
             <p className="line-clamp-3 font-serif text-sm">&ldquo;{q.text}&rdquo;</p>
+            {q.reaction ? (
+              <p className="mt-2 line-clamp-2 text-sm">{q.reaction}</p>
+            ) : (
+              <p className="mt-2 text-sm text-accent">Add your reaction →</p>
+            )}
             <div className="mt-1 flex items-center justify-between gap-2">
               <span className="text-xs text-muted">{q.location || "No location"}</span>
               <span className={`text-xs ${q.visibility === "public" ? "text-accent" : "text-muted"}`}>

@@ -2,7 +2,7 @@
 --
 -- Copyright model: books uploaded by readers live in the private `books`
 -- storage bucket and are readable only by the uploader. Only quotes (short,
--- cited, with the reader's own note) and the conversations around them can be
+-- cited, with the reader's own reaction) and the discussions around them can be
 -- made public.
 
 -- ---------------------------------------------------------------------------
@@ -13,7 +13,6 @@ create type public.file_type as enum ('epub', 'pdf');
 create type public.reading_status as enum ('reading', 'finished', 'abandoned');
 create type public.visibility as enum ('private', 'public');
 create type public.quote_source as enum ('upload', 'kindle');
-create type public.conversation_mode as enum ('react', 'argue');
 create type public.message_role as enum ('user', 'assistant');
 
 -- ---------------------------------------------------------------------------
@@ -106,15 +105,16 @@ create table public.quotes (
   anchor          text,
   -- How far into the book the quote is (0–1), for the reading-trail map.
   position        double precision check (position between 0 and 1),
-  note            text not null default '' check (char_length(note) <= 5000),
+  -- The reader's own reaction to the passage: the heart of a quote.
+  reaction        text not null default '' check (char_length(reaction) <= 5000),
   source          public.quote_source not null,
   visibility      public.visibility not null default 'private',
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
-  -- A public quote must be commentary with a citation, not bare copying.
-  constraint public_quote_needs_note_and_citation check (
+  -- A public quote must carry the reader's reaction and a citation, not bare copying.
+  constraint public_quote_needs_reaction_and_citation check (
     visibility = 'private'
-    or (char_length(btrim(note)) > 0 and char_length(btrim(location)) > 0)
+    or (char_length(btrim(reaction)) > 0 and char_length(btrim(location)) > 0)
   )
 );
 
@@ -142,7 +142,8 @@ create table public.personas (
 );
 
 -- ---------------------------------------------------------------------------
--- Conversations about a quote. Visibility follows the quote.
+-- Discussions with a character about the reader's reaction to a quote.
+-- Visibility follows the quote.
 -- ---------------------------------------------------------------------------
 
 create table public.conversations (
@@ -150,7 +151,6 @@ create table public.conversations (
   user_id    uuid not null references public.profiles (id) on delete cascade,
   quote_id   uuid not null references public.quotes (id) on delete cascade,
   persona_id uuid not null references public.personas (id) on delete restrict,
-  mode       public.conversation_mode not null default 'react',
   created_at timestamptz not null default now()
 );
 

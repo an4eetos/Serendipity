@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-const characters = ["Socrates", "Diogenes", "Seneca", "Marcus Aurelius", "Nietzsche", "Montaigne"];
-
 export default function Home() {
   return (
     <div className="mx-auto max-w-2xl py-12">
@@ -11,9 +9,9 @@ export default function Home() {
         Then say something new.
       </h1>
       <p className="mt-6 text-lg text-muted">
-        Highlight a passage from your own copy of a book. Bring it to {characters.slice(0, -1).join(", ")} or{" "}
-        {characters.at(-1)} — get their reaction, or argue with them. Keep your quotes, notes and conversations on a
-        profile that shows what you actually read.
+        Highlight a passage from your own copy of a book and write your reaction to it. If you want to take it further,
+        talk it over with Socrates, Diogenes, Seneca or another character. Your quotes and reactions live on a profile
+        that shows what you actually read — and what you think about it.
       </p>
       <div className="mt-8 flex gap-3">
         <Link href="/library" className="btn btn-primary px-5 py-2.5 text-base">
@@ -32,15 +30,15 @@ export default function Home() {
           </p>
         </div>
         <div>
-          <h2 className="font-semibold">Quotes with a point of view</h2>
+          <h2 className="font-semibold">Your reaction is the point</h2>
           <p className="mt-1 text-sm text-muted">
-            A quote goes public only with your own note and a citation — your perspective next to the author&apos;s.
+            A quote goes public only with your own reaction and a citation — your perspective next to the author&apos;s.
           </p>
         </div>
         <div>
-          <h2 className="font-semibold">Talk back</h2>
+          <h2 className="font-semibold">Discuss it, if you like</h2>
           <p className="mt-1 text-sm text-muted">
-            Each character reacts in their own voice. Switch to argue mode when you want a fight.
+            Bring your reaction to a character and see how it holds up. They answer you, in their own voice.
           </p>
         </div>
       </section>

@@ -11,6 +11,7 @@ import (
 
 	"github.com/an4eetos/serendipity/api/internal/auth"
 	"github.com/an4eetos/serendipity/api/internal/llm"
+	"github.com/an4eetos/serendipity/api/internal/quote"
 	"github.com/an4eetos/serendipity/api/internal/store"
 )
 
@@ -33,22 +34,16 @@ type event struct {
 type createConversationRequest struct {
 	QuoteID   string `json:"quote_id"`
 	PersonaID string `json:"persona_id"`
-	Mode      string `json:"mode"`
 }
 
-// createConversation starts a conversation about a quote and streams the
-// character's first reaction.
+// createConversation starts a discussion of the reader's reaction to a quote
+// and streams the character's first reply. The reader must have written a
+// reaction: the character discusses it, rather than reacting to the passage
+// on its own.
 func (s *Server) createConversation(w http.ResponseWriter, r *http.Request) {
 	var req createConversationRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, r, err)
-		return
-	}
-	if req.Mode == "" {
-		req.Mode = llm.ModeReact
-	}
-	if !llm.ValidMode(req.Mode) {
-		writeError(w, r, badRequest("mode must be react or argue"))
 		return
 	}
 	ctx, uid := r.Context(), auth.UserID(r.Context())
@@ -57,12 +52,16 @@ func (s *Server) createConversation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
+	if !quote.HasReaction(q.Reaction) {
+		writeError(w, r, badRequest("%s", quote.ErrReactionRequired.Error()))
+		return
+	}
 	persona, err := s.store.GetPersona(ctx, uid, req.PersonaID)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	convID, err := s.store.CreateConversation(ctx, uid, q.ID, persona.ID, req.Mode)
+	convID, err := s.store.CreateConversation(ctx, uid, q.ID, persona.ID)
 	if err != nil {
 		writeError(w, r, err)
 		return
@@ -78,7 +77,6 @@ func (s *Server) createConversation(w http.ResponseWriter, r *http.Request) {
 	ok := s.streamReply(ctx, stream, convID, llm.Request{
 		PersonaName:   persona.Name,
 		PersonaPrompt: persona.SystemPrompt,
-		Mode:          req.Mode,
 		Passage:       passageOf(q),
 	})
 	if !ok {
@@ -120,6 +118,10 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
+	if !quote.HasReaction(q.Reaction) {
+		writeError(w, r, badRequest("%s", quote.ErrReactionRequired.Error()))
+		return
+	}
 	userMsg, err := s.store.AppendMessage(ctx, conv.ID, "user", req.Content)
 	if err != nil {
 		writeError(w, r, err)
@@ -141,7 +143,6 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 	ok := s.streamReply(ctx, stream, conv.ID, llm.Request{
 		PersonaName:   conv.Persona.Name,
 		PersonaPrompt: conv.Persona.SystemPrompt,
-		Mode:          conv.Mode,
 		Passage:       passageOf(q),
 		History:       history,
 	})
@@ -182,7 +183,7 @@ func (s *Server) streamReply(ctx context.Context, stream *sse, convID string, re
 }
 
 func passageOf(q store.Quote) llm.Passage {
-	p := llm.Passage{Text: q.Text, Location: q.Location, Note: q.Note}
+	p := llm.Passage{Text: q.Text, Location: q.Location, Reaction: q.Reaction}
 	if q.Work != nil {
 		p.Title = q.Work.Title
 		p.Authors = q.Work.Authors

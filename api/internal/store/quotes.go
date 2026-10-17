@@ -5,7 +5,7 @@ import (
 )
 
 const quoteCols = `q.id, q.work_id, q.library_item_id, q.text, q.location, q.anchor, q.position,
-	q.note, q.source, q.visibility, q.created_at, q.updated_at, ` + workCols
+	q.reaction, q.source, q.visibility, q.created_at, q.updated_at, ` + workCols
 
 const quoteFrom = ` from quotes q join works w on w.id = q.work_id `
 
@@ -13,7 +13,7 @@ func scanQuote(row interface{ Scan(...any) error }) (Quote, error) {
 	var q Quote
 	q.Work = &Work{}
 	dest := []any{&q.ID, &q.WorkID, &q.LibraryItemID, &q.Text, &q.Location, &q.Anchor, &q.Position,
-		&q.Note, &q.Source, &q.Visibility, &q.CreatedAt, &q.UpdatedAt}
+		&q.Reaction, &q.Source, &q.Visibility, &q.CreatedAt, &q.UpdatedAt}
 	dest = append(dest, scanWorkInto(q.Work)...)
 	err := row.Scan(dest...)
 	return q, notFound(err)
@@ -26,18 +26,18 @@ type NewQuote struct {
 	Location      string
 	Anchor        *string
 	Position      *float64
-	Note          string
+	Reaction      string
 	Source        string
 }
 
 func (s *Store) CreateQuote(ctx context.Context, userID string, n NewQuote) (Quote, error) {
 	var id string
 	err := s.pool.QueryRow(ctx, `
-		insert into quotes (user_id, work_id, library_item_id, text, location, anchor, position, note, source)
+		insert into quotes (user_id, work_id, library_item_id, text, location, anchor, position, reaction, source)
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9::quote_source)
 		on conflict (user_id, work_id, md5(text)) do update set updated_at = quotes.updated_at
 		returning id`,
-		userID, n.WorkID, n.LibraryItemID, n.Text, n.Location, n.Anchor, n.Position, n.Note, n.Source).Scan(&id)
+		userID, n.WorkID, n.LibraryItemID, n.Text, n.Location, n.Anchor, n.Position, n.Reaction, n.Source).Scan(&id)
 	if err != nil {
 		return Quote{}, err
 	}
@@ -48,10 +48,10 @@ func (s *Store) CreateQuote(ctx context.Context, userID string, n NewQuote) (Quo
 // work, and reports whether it was inserted.
 func (s *Store) ImportQuote(ctx context.Context, userID string, n NewQuote) (bool, error) {
 	tag, err := s.pool.Exec(ctx, `
-		insert into quotes (user_id, work_id, library_item_id, text, location, note, source)
+		insert into quotes (user_id, work_id, library_item_id, text, location, reaction, source)
 		values ($1, $2, $3, $4, $5, $6, $7::quote_source)
 		on conflict (user_id, work_id, md5(text)) do nothing`,
-		userID, n.WorkID, n.LibraryItemID, n.Text, n.Location, n.Note, n.Source)
+		userID, n.WorkID, n.LibraryItemID, n.Text, n.Location, n.Reaction, n.Source)
 	if err != nil {
 		return false, err
 	}
@@ -83,17 +83,17 @@ func (s *Store) ListQuotes(ctx context.Context, userID, workID string) ([]Quote,
 }
 
 type QuotePatch struct {
-	Note       *string `json:"note"`
+	Reaction   *string `json:"reaction"`
 	Visibility *string `json:"visibility"`
 }
 
 func (s *Store) UpdateQuote(ctx context.Context, userID, id string, p QuotePatch) (Quote, error) {
 	tag, err := s.pool.Exec(ctx, `
 		update quotes set
-			note       = coalesce($3, note),
+			reaction   = coalesce($3, reaction),
 			visibility = coalesce($4::visibility, visibility),
 			updated_at = now()
-		where user_id = $1 and id = $2`, userID, id, p.Note, p.Visibility)
+		where user_id = $1 and id = $2`, userID, id, p.Reaction, p.Visibility)
 	if err != nil {
 		return Quote{}, err
 	}
@@ -154,11 +154,11 @@ func (s *Store) GetPersona(ctx context.Context, userID, id string) (Persona, err
 // Conversations
 // ---------------------------------------------------------------------------
 
-func (s *Store) CreateConversation(ctx context.Context, userID, quoteID, personaID, mode string) (string, error) {
+func (s *Store) CreateConversation(ctx context.Context, userID, quoteID, personaID string) (string, error) {
 	var id string
 	err := s.pool.QueryRow(ctx, `
-		insert into conversations (user_id, quote_id, persona_id, mode)
-		values ($1, $2, $3, $4::conversation_mode) returning id`, userID, quoteID, personaID, mode).Scan(&id)
+		insert into conversations (user_id, quote_id, persona_id)
+		values ($1, $2, $3) returning id`, userID, quoteID, personaID).Scan(&id)
 	return id, err
 }
 
@@ -199,7 +199,7 @@ func (s *Store) ListConversationsForQuote(ctx context.Context, userID, quoteID s
 
 func (s *Store) conversations(ctx context.Context, where string, args ...any) ([]Conversation, error) {
 	rows, err := s.pool.Query(ctx, `
-		select c.id, c.quote_id, c.mode, c.created_at, `+personaCols+`
+		select c.id, c.quote_id, c.created_at, `+personaCols+`
 		from conversations c join personas p on p.id = c.persona_id
 		where `+where+` order by c.created_at`, args...)
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *Store) conversations(ctx context.Context, where string, args ...any) ([
 	ids := []string{}
 	for rows.Next() {
 		var c Conversation
-		dest := append([]any{&c.ID, &c.QuoteID, &c.Mode, &c.CreatedAt}, personaDest(&c.Persona)...)
+		dest := append([]any{&c.ID, &c.QuoteID, &c.CreatedAt}, personaDest(&c.Persona)...)
 		if err := rows.Scan(dest...); err != nil {
 			rows.Close()
 			return nil, err

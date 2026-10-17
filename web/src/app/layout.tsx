@@ -8,7 +8,7 @@ const literata = Literata({ variable: "--font-literata", subsets: ["latin", "cyr
 
 export const metadata: Metadata = {
   title: "Serendipity",
-  description: "Prove you read it. Quote it, react to it, argue with Socrates about it.",
+  description: "Prove you read it. Quote it, react to it, and talk your reaction over with Socrates.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

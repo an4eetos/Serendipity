@@ -55,7 +55,7 @@ export type Quote = {
   location: string;
   anchor: string | null;
   position: number | null;
-  note: string;
+  reaction: string;
   source: "upload" | "kindle";
   visibility: Visibility;
   created_at: string;
@@ -72,8 +72,6 @@ export type Persona = {
   is_preset: boolean;
 };
 
-export type Mode = "react" | "argue";
-
 export type Message = {
   id: number;
   role: "user" | "assistant";
@@ -84,7 +82,6 @@ export type Message = {
 export type Conversation = {
   id: string;
   quote_id: string;
-  mode: Mode;
   persona: Persona;
   messages: Message[];
   created_at: string;

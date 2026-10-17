@@ -1,8 +1,10 @@
 # Serendipity
 
 Read it for real, then say something new. Quote passages from your own copy of
-a book, get a reaction from Socrates or Diogenes (or argue with them), and keep
-it all on a profile that shows what you actually read.
+a book and write your reaction to them. If you want, talk your reaction over
+with Socrates, Diogenes or another character. Your quotes, reactions and
+discussions live on a profile that shows what you actually read and what you
+think about it.
 
 Product spec and copyright model: [docs/PRODUCT.md](docs/PRODUCT.md).
 
@@ -66,8 +68,8 @@ access token (`Authorization: Bearer …`).
 | GET/PATCH | `/library/{id}` | Book, progress, uploaded file |
 | GET | `/library/{id}/file-url` | Signed URL for the owner's file (10 min) |
 | POST | `/imports/kindle` | Multipart `file` = My Clippings.txt |
-| GET/POST | `/quotes` | List (optionally `?work_id=`) / create |
-| GET/PATCH/DELETE | `/quotes/{id}` | Quote + conversations; note, visibility |
+| GET/POST | `/quotes` | List (optionally `?work_id=`) / create (with optional `reaction`) |
+| GET/PATCH/DELETE | `/quotes/{id}` | Quote + discussions; edit reaction, visibility |
 | GET | `/personas` | Characters |
-| POST | `/conversations` | Start (quote, persona, `react`/`argue`); streams SSE |
+| POST | `/conversations` | Discuss a quote's reaction with a character (needs a reaction); streams SSE |
 | POST | `/conversations/{id}/messages` | Reply; streams SSE |

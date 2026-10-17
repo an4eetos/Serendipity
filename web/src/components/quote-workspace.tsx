@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { del, get, patch, stream } from "@/lib/api";
-import type { Conversation, Message, Mode, Persona, Quote, QuoteWithConversations } from "@/lib/types";
+import type { Conversation, Message, Persona, Quote, QuoteWithConversations } from "@/lib/types";
 
 let personasCache: Promise<Persona[]> | undefined;
 function loadPersonas() {
@@ -36,14 +36,6 @@ export function MessageBubble({ message, personaName }: { message: Pick<Message,
         {message.content}
       </div>
     </div>
-  );
-}
-
-function ModeBadge({ mode }: { mode: Mode }) {
-  return (
-    <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
-      {mode === "argue" ? "argument" : "reaction"}
-    </span>
   );
 }
 
@@ -90,9 +82,9 @@ export function QuoteWorkspace({ quoteId, onChange, onDeleted }: Props) {
         </div>
       </blockquote>
 
-      <NoteEditor quote={quote} onSaved={updateQuote} onDeleted={onDeleted} />
+      <ReactionEditor quote={quote} onSaved={updateQuote} onDeleted={onDeleted} />
 
-      <Conversations
+      <Discussions
         quote={quote}
         personas={personas}
         conversations={quote.conversations}
@@ -106,7 +98,7 @@ export function QuoteWorkspace({ quoteId, onChange, onDeleted }: Props) {
 
 // ---------------------------------------------------------------------------
 
-function NoteEditor({
+function ReactionEditor({
   quote,
   onSaved,
   onDeleted,
@@ -115,12 +107,12 @@ function NoteEditor({
   onSaved: (q: Quote) => void;
   onDeleted?: () => void;
 }) {
-  const [note, setNote] = useState(quote.note);
+  const [reaction, setReaction] = useState(quote.reaction);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const dirty = note !== quote.note;
+  const dirty = reaction !== quote.reaction;
 
-  async function save(body: { note?: string; visibility?: "public" | "private" }) {
+  async function save(body: { reaction?: string; visibility?: "public" | "private" }) {
     setBusy(true);
     setError(undefined);
     try {
@@ -133,7 +125,7 @@ function NoteEditor({
   }
 
   async function remove() {
-    if (!confirm("Delete this quote and its conversations?")) return;
+    if (!confirm("Delete this quote, your reaction and its discussions?")) return;
     setBusy(true);
     try {
       await del(`/quotes/${quote.id}`);
@@ -147,28 +139,28 @@ function NoteEditor({
   const isPublic = quote.visibility === "public";
   return (
     <section className="space-y-2">
-      <label className="text-sm font-medium" htmlFor={`note-${quote.id}`}>
-        Your note
+      <label className="font-medium" htmlFor={`reaction-${quote.id}`}>
+        Your reaction
       </label>
       <textarea
-        id={`note-${quote.id}`}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={3}
-        placeholder="What does this make you think? Your perspective is what gets published."
-        className="input resize-y"
+        id={`reaction-${quote.id}`}
+        value={reaction}
+        onChange={(e) => setReaction(e.target.value)}
+        rows={4}
+        placeholder="What does this passage do to you? Agree, disagree, connect it to something — this is what you share."
+        className="input resize-y text-[0.95rem]"
       />
       <div className="flex flex-wrap items-center gap-2">
-        <button className="btn" disabled={!dirty || busy} onClick={() => save({ note })}>
-          Save note
+        <button className="btn" disabled={!dirty || busy} onClick={() => save({ reaction })}>
+          Save reaction
         </button>
         <button
           className={`btn ${isPublic ? "" : "btn-primary"}`}
           disabled={busy}
           onClick={() =>
-            save({ note: dirty ? note : undefined, visibility: isPublic ? "private" : "public" })
+            save({ reaction: dirty ? reaction : undefined, visibility: isPublic ? "private" : "public" })
           }
-          title={isPublic ? undefined : "Shows the quote, your note and its conversations on your profile"}
+          title={isPublic ? undefined : "Shows the quote, your reaction and its discussions on your profile"}
         >
           {isPublic ? "Make private" : "Publish to profile"}
         </button>
@@ -189,7 +181,7 @@ function NoteEditor({
 
 type SetConversations = (fn: (prev: Conversation[]) => Conversation[]) => void;
 
-function Conversations({
+function Discussions({
   quote,
   personas,
   conversations,
@@ -200,27 +192,29 @@ function Conversations({
   conversations: Conversation[];
   setConversations: SetConversations;
 }) {
+  const [open, setOpen] = useState(false);
   const [personaId, setPersonaId] = useState<string>();
-  const [mode, setMode] = useState<Mode>("react");
-  const [pending, setPending] = useState<{ persona: Persona; mode: Mode; text: string }>();
+  const [pending, setPending] = useState<{ persona: Persona; text: string }>();
   const [error, setError] = useState<string>();
 
   const persona = personas.find((p) => p.id === (personaId ?? personas[0]?.id));
+  const hasReaction = quote.reaction.trim() !== "";
 
   async function start() {
     if (!persona) return;
     setError(undefined);
-    setPending({ persona, mode, text: "" });
+    setPending({ persona, text: "" });
     let convId = "";
     try {
-      await stream("/conversations", { quote_id: quote.id, persona_id: persona.id, mode }, (e) => {
+      await stream("/conversations", { quote_id: quote.id, persona_id: persona.id }, (e) => {
         if (e.type === "start") convId = e.conversation_id;
         if (e.type === "delta") setPending((p) => p && { ...p, text: p.text + e.text });
         if (e.type === "done") {
           setConversations((prev) => [
             ...prev,
-            { id: convId, quote_id: quote.id, mode, persona, messages: [e.message], created_at: e.message.created_at },
+            { id: convId, quote_id: quote.id, persona, messages: [e.message], created_at: e.message.created_at },
           ]);
+          setOpen(false);
         }
         if (e.type === "error") setError(e.error);
       });
@@ -233,7 +227,7 @@ function Conversations({
 
   return (
     <section className="space-y-4">
-      <h3 className="text-sm font-medium">Conversations</h3>
+      {conversations.length > 0 && <h3 className="text-sm font-medium">Discussions</h3>}
 
       {conversations.map((c) => (
         <Thread key={c.id} conversation={c} setConversations={setConversations} />
@@ -241,10 +235,7 @@ function Conversations({
 
       {pending && (
         <div className="card space-y-3 p-3">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{pending.persona.name}</span>
-            <ModeBadge mode={pending.mode} />
-          </div>
+          <p className="font-medium">{pending.persona.name}</p>
           <MessageBubble
             message={{ role: "assistant", content: pending.text || "…" }}
             personaName={pending.persona.name}
@@ -252,40 +243,43 @@ function Conversations({
         </div>
       )}
 
-      <div className="card space-y-3 p-3">
-        <div className="flex flex-wrap gap-1.5">
-          {personas.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPersonaId(p.id)}
-              title={`${p.era} — ${p.short_bio}`}
-              className={`rounded-full border px-3 py-1 text-sm transition ${
-                p.id === persona?.id ? "border-accent bg-accent-soft text-accent" : "border-line hover:border-muted"
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {persona && <p className="text-xs text-muted">{persona.short_bio}</p>}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border border-line text-sm">
-            {(["react", "argue"] as Mode[]).map((m) => (
+      {!hasReaction ? (
+        <p className="text-sm text-muted">
+          Once you&apos;ve saved your reaction, you can discuss it with a character if you want.
+        </p>
+      ) : !open ? (
+        <button className="btn" disabled={!!pending} onClick={() => setOpen(true)}>
+          {conversations.length ? "Discuss with someone else" : "Discuss your reaction with a character"}
+        </button>
+      ) : (
+        <div className="card space-y-3 p-3">
+          <p className="text-sm text-muted">Who do you want to talk this over with?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {personas.map((p) => (
               <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-3 py-1.5 ${mode === m ? "bg-accent-soft text-accent" : ""}`}
+                key={p.id}
+                onClick={() => setPersonaId(p.id)}
+                title={`${p.era} — ${p.short_bio}`}
+                className={`rounded-full border px-3 py-1 text-sm transition ${
+                  p.id === persona?.id ? "border-accent bg-accent-soft text-accent" : "border-line hover:border-muted"
+                }`}
               >
-                {m === "react" ? "React" : "Argue"}
+                {p.name}
               </button>
             ))}
           </div>
-          <button className="btn btn-primary" disabled={!persona || !!pending} onClick={start}>
-            {mode === "react" ? `Ask ${persona?.name ?? "…"} to react` : `Argue with ${persona?.name ?? "…"}`}
-          </button>
+          {persona && <p className="text-xs text-muted">{persona.short_bio}</p>}
+          <div className="flex gap-2">
+            <button className="btn btn-primary" disabled={!persona || !!pending} onClick={start}>
+              Discuss with {persona?.name ?? "…"}
+            </button>
+            <button className="btn" disabled={!!pending} onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
         </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
-      </div>
+      )}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </section>
   );
 }
@@ -338,10 +332,7 @@ function Thread({ conversation, setConversations }: { conversation: Conversation
 
   return (
     <div className="card space-y-3 p-3">
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{name}</span>
-        <ModeBadge mode={conversation.mode} />
-      </div>
+      <p className="font-medium">{name}</p>
       {conversation.messages.map((m) => (
         <MessageBubble key={m.id} message={m} personaName={name} />
       ))}

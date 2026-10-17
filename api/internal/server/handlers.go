@@ -281,8 +281,9 @@ func (s *Server) importKindle(w http.ResponseWriter, r *http.Request) {
 				LibraryItemID: &item.ID,
 				Text:          h.Text,
 				Location:      h.Location(),
-				Note:          h.Note,
-				Source:        "kindle",
+				// A Kindle note is the reader's reaction to that highlight.
+				Reaction: h.Note,
+				Source:   "kindle",
 			})
 			if err != nil {
 				writeError(w, r, err)
@@ -308,7 +309,7 @@ type createQuoteRequest struct {
 	Location      string   `json:"location"`
 	Anchor        *string  `json:"anchor"`
 	Position      *float64 `json:"position"`
-	Note          string   `json:"note"`
+	Reaction      string   `json:"reaction"`
 }
 
 func (s *Server) createQuote(w http.ResponseWriter, r *http.Request) {
@@ -320,6 +321,10 @@ func (s *Server) createQuote(w http.ResponseWriter, r *http.Request) {
 	req.Text = strings.TrimSpace(req.Text)
 	if err := quote.ValidateText(req.Text); err != nil {
 		writeError(w, r, badRequest("%s", err.Error()))
+		return
+	}
+	if len(req.Reaction) > 5000 {
+		writeError(w, r, badRequest("reaction is too long"))
 		return
 	}
 	if req.Position != nil && (*req.Position < 0 || *req.Position > 1) {
@@ -338,7 +343,7 @@ func (s *Server) createQuote(w http.ResponseWriter, r *http.Request) {
 		Location:      truncate(strings.TrimSpace(req.Location), 200),
 		Anchor:        req.Anchor,
 		Position:      req.Position,
-		Note:          req.Note,
+		Reaction:      req.Reaction,
 		Source:        "upload",
 	})
 	if err != nil {
@@ -393,20 +398,20 @@ func (s *Server) patchQuote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, badRequest("invalid visibility"))
 		return
 	}
-	if p.Note != nil && len(*p.Note) > 5000 {
-		writeError(w, r, badRequest("note is too long"))
+	if p.Reaction != nil && len(*p.Reaction) > 5000 {
+		writeError(w, r, badRequest("reaction is too long"))
 		return
 	}
 	// Check the result of the patch against the publishing rules.
-	note, visibility := current.Note, current.Visibility
-	if p.Note != nil {
-		note = *p.Note
+	reaction, visibility := current.Reaction, current.Visibility
+	if p.Reaction != nil {
+		reaction = *p.Reaction
 	}
 	if p.Visibility != nil {
 		visibility = *p.Visibility
 	}
 	if visibility == "public" {
-		if err := quote.ValidatePublic(current.Text, note, current.Location); err != nil {
+		if err := quote.ValidatePublic(current.Text, reaction, current.Location); err != nil {
 			writeError(w, r, badRequest("%s", err.Error()))
 			return
 		}
