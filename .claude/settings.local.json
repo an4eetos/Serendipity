@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find ~ -type f -name \"*.md\" 2>/dev/null | xargs grep -l \"CS2\\\\|Tactical CS\\\\|gameplan\" 2>/dev/null | grep -v \"node_modules\\\\|\\\\.git\" | head -10)",
+      "Read(//Users/anuarkuanysh/**)"
+    ]
+  }
+}
