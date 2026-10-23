@@ -54,7 +54,8 @@ Guardrails enforced today:
 - Kindle imports land private; re-imports are de-duplicated.
 
 Before launch: terms of service (uploaders confirm they own their copy), a
-DMCA/takedown process, and legal review. This document is not legal advice.
+DMCA/takedown process, and legal review (roadmap Phase 1). This document is
+not legal advice.
 
 ## Characters
 
@@ -70,19 +71,12 @@ fallbacks (`fallbacks: "default"`). Configurable via `ANTHROPIC_MODEL`.
 
 ## Roadmap
 
-Next, roughly in order:
+Phased, with dependencies, open questions and exit criteria, in
+[ROADMAP.md](ROADMAP.md):
 
-- **Custom characters** — readers write their own persona prompt (schema already
-  supports `personas.owner_id`).
-- **Reading trail** — map of where in a book your quotes come from
-  (`quotes.position` is already stored) as proof of reading.
-- **Socratic check** — Socrates questions you on a book you finished; passing
-  earns a *verified read* badge.
-- **Public-coverage cap per book** — limit how much of one copyrighted work can
-  be public across all users, so aggregation can't reconstruct it.
-- **Social** — follows, other readers reacting to the same passage, comments on
-  public reactions, a feed of fresh reactions.
-- **Public-domain catalog** — Standard Ebooks / Project Gutenberg books readable
-  by everyone.
-- **Page-photo OCR** — quote from a physical book by photographing the page.
-- More imports (Apple Books, Kobo, Readwise).
+1. **Open to strangers** — terms and ownership confirmation, report and
+   takedown, public-coverage cap per book, reading trail.
+2. **Characters** — custom characters, Socratic check (*verified read* badge).
+3. **Social** — follows, feed, same-passage reactions, comments.
+4. **More ways in** — Readwise / Apple Books / Kobo imports, page-photo OCR,
+   public-domain catalog.
