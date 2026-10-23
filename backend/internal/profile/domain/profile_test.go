@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"testing"
+	"time"
 
 	discussion "github.com/an4eetos/serendipity/backend/internal/discussion/domain"
 	quote "github.com/an4eetos/serendipity/backend/internal/quote/domain"
@@ -64,5 +65,35 @@ func TestNewPublicProfile(t *testing.T) {
 	}
 	if c := got.Quotes[1].Conversations; c == nil || len(c) != 0 {
 		t.Errorf("q2 conversations = %#v, want empty", c)
+	}
+}
+
+func TestNewPublicProfileShowsQuotesAsPublicPagesDo(t *testing.T) {
+	removedAt := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	quotes := []quote.Quote{
+		{ID: "shown", Text: "To be", Reaction: "Mine", Location: "Act 3"},
+		{ID: "collapsed", Text: "Or not to be", Reaction: "Yours", Location: "Act 3", PassageHidden: true,
+			RemovedAt: &removedAt, RemovedReason: "never leaks"},
+	}
+	got := NewPublicProfile(Profile{ID: "u"}, nil, nil, quotes, nil)
+	if q := got.Quotes[0].Quote; q.Text != "To be" || q.Reaction != "Mine" {
+		t.Errorf("shown quote = %#v", q)
+	}
+	q := got.Quotes[1].Quote
+	if q.Text != "" || !q.PassageHidden || q.Reaction != "Yours" || q.Location != "Act 3" {
+		t.Errorf("collapsed quote = %#v, want the passage blanked and the reaction and citation kept", q)
+	}
+	if q.RemovedAt != nil || q.RemovedReason != "" {
+		t.Errorf("collapsed quote keeps removal details %v %q", q.RemovedAt, q.RemovedReason)
+	}
+}
+
+func TestPublicBookUnplaced(t *testing.T) {
+	b := PublicBook{PublicQuotes: 5, Trail: []TrailPoint{{QuoteID: "a", Position: 0.1}, {QuoteID: "b", Position: 0.9}}}
+	if got := b.Unplaced(); got != 3 {
+		t.Errorf("Unplaced() = %d, want 3", got)
+	}
+	if got := (PublicBook{}).Unplaced(); got != 0 {
+		t.Errorf("empty book: Unplaced() = %d", got)
 	}
 }

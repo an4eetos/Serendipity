@@ -33,7 +33,8 @@ func (h *Handler) importKindle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	report, err := h.importer.Execute(r.Context(), httpapi.UserID(r.Context()), file)
+	confirmed := r.FormValue("ownership_confirmed") == "true"
+	report, err := h.importer.Execute(r.Context(), httpapi.UserID(r.Context()), file, confirmed)
 	if err != nil {
 		httpapi.WriteError(w, r, err)
 		return

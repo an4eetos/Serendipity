@@ -14,7 +14,8 @@ import (
 var Discussion = fx.Module("discussion",
 	fx.Provide(
 		fx.Annotate(postgres.NewPersonaRepository, fx.As(new(ports.PersonaRepository))),
-		fx.Annotate(postgres.NewConversationRepository, fx.As(new(ports.ConversationRepository))),
+		fx.Annotate(postgres.NewConversationRepository,
+			fx.As(new(ports.ConversationRepository)), fx.As(new(ports.ConversationModeration))),
 		fx.Annotate(newCharacterModel, fx.As(new(ports.CharacterModel))),
 		usecase.NewListPersonas,
 		usecase.NewGetThread,

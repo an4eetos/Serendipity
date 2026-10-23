@@ -8,6 +8,7 @@ import { useRequireSession } from "@/lib/auth";
 import type { LibraryItem, Quote } from "@/lib/types";
 import { QuoteWorkspace } from "./quote-workspace";
 import type { Selection } from "./readers/types";
+import { ReadingTrail, type TrailDot } from "./reading-trail";
 
 const EpubReader = dynamic(() => import("./readers/epub-reader"), { ssr: false });
 const PdfReader = dynamic(() => import("./readers/pdf-reader"), { ssr: false });
@@ -75,11 +76,17 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
     }
   }
 
+  function openQuote(q: Quote) {
+    setActiveQuote(q.id);
+    if (q.anchor) setJumpTo(q.anchor);
+  }
+
   if (error) return <p className="text-danger">{error}</p>;
   if (!item) return <p className="text-muted">Loading…</p>;
 
   const words = selection ? selection.text.split(/\s+/).filter(Boolean).length : 0;
   const Reader = item.file_type === "pdf" ? PdfReader : EpubReader;
+  const dots: TrailDot[] = quotes.flatMap((q) => (q.position == null ? [] : [{ id: q.id, position: q.position }]));
 
   return (
     <div className="space-y-4">
@@ -90,6 +97,21 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
         <h1 className="font-serif text-2xl font-semibold">{item.work.title}</h1>
         <p className="text-sm text-muted">{item.work.authors.join(", ")}</p>
       </div>
+
+      {quotes.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted">Your reading trail</p>
+          <ReadingTrail
+            dots={dots}
+            unplaced={quotes.length - dots.length}
+            activeId={activeQuote}
+            onSelect={(id) => {
+              const q = quotes.find((x) => x.id === id);
+              if (q) openQuote(q);
+            }}
+          />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="card h-[75vh] p-3">
@@ -168,13 +190,7 @@ export function ReadingRoom({ itemId }: { itemId: string }) {
               />
             </div>
           ) : (
-            <QuoteList
-              quotes={quotes}
-              onOpen={(q) => {
-                setActiveQuote(q.id);
-                if (q.anchor) setJumpTo(q.anchor);
-              }}
-            />
+            <QuoteList quotes={quotes} onOpen={openQuote} />
           )}
         </aside>
       </div>
@@ -201,10 +217,14 @@ function QuoteList({ quotes, onOpen }: { quotes: Quote[]; onOpen: (q: Quote) => 
             ) : (
               <p className="mt-2 text-sm text-accent">Add your reaction →</p>
             )}
-            <div className="mt-1 flex items-center justify-between gap-2">
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs text-muted">{q.location || "No location"}</span>
-              <span className={`text-xs ${q.visibility === "public" ? "text-accent" : "text-muted"}`}>
-                {q.visibility}
+              <span className="flex flex-wrap items-center gap-2 text-xs">
+                {q.removed_at && <span className="text-danger">Removed</span>}
+                {q.visibility === "public" && q.passage_hidden && (
+                  <span className="text-muted">Passage hidden publicly</span>
+                )}
+                <span className={q.visibility === "public" ? "text-accent" : "text-muted"}>{q.visibility}</span>
               </span>
             </div>
           </button>

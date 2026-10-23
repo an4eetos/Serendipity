@@ -41,9 +41,61 @@ func ToProfileResponse(p domain.Profile) ProfileResponse {
 	}
 }
 
+// MeResponse is the signed-in reader's own profile and where they stand on
+// the terms of service.
+type MeResponse struct {
+	ProfileResponse
+	TermsVersion        string     `json:"terms_version"`
+	TermsAcceptedAt     *time.Time `json:"terms_accepted_at"`
+	CurrentTermsVersion string     `json:"current_terms_version"`
+	TermsAccepted       bool       `json:"terms_accepted"`
+}
+
+func ToMeResponse(m domain.Me) MeResponse {
+	return MeResponse{
+		ProfileResponse:     ToProfileResponse(m.Profile),
+		TermsVersion:        m.Profile.TermsVersion,
+		TermsAcceptedAt:     m.Profile.TermsAcceptedAt,
+		CurrentTermsVersion: m.CurrentTerms.Version,
+		TermsAccepted:       m.TermsAccepted,
+	}
+}
+
+type TermsResponse struct {
+	Version string `json:"version"`
+}
+
+func ToTermsResponse(t domain.Terms) TermsResponse {
+	return TermsResponse{Version: t.Version}
+}
+
+// AcceptTermsRequest names the version of the terms the reader was shown.
+type AcceptTermsRequest struct {
+	Version string `json:"version"`
+}
+
 type CategoryResponse struct {
 	Name  string `json:"name"`
 	Books int    `json:"books"`
+}
+
+type TrailPointResponse struct {
+	QuoteID  string  `json:"quote_id"`
+	Position float64 `json:"position"`
+}
+
+// TrailResponse is a book's reading trail. Points is never null.
+type TrailResponse struct {
+	Points   []TrailPointResponse `json:"points"`
+	Unplaced int                  `json:"unplaced"`
+}
+
+func ToTrailResponse(b domain.PublicBook) TrailResponse {
+	points := make([]TrailPointResponse, len(b.Trail))
+	for i, p := range b.Trail {
+		points[i] = TrailPointResponse{QuoteID: p.QuoteID, Position: p.Position}
+	}
+	return TrailResponse{Points: points, Unplaced: b.Unplaced()}
 }
 
 type PublicBookResponse struct {
@@ -51,6 +103,7 @@ type PublicBookResponse struct {
 	Status       string                   `json:"status"`
 	Progress     float64                  `json:"progress"`
 	PublicQuotes int                      `json:"public_quotes"`
+	Trail        TrailResponse            `json:"trail"`
 }
 
 type PublicProfileResponse struct {
@@ -76,6 +129,7 @@ func ToPublicProfileResponse(p domain.PublicProfile) PublicProfileResponse {
 			Status:       string(b.Status),
 			Progress:     b.Progress,
 			PublicQuotes: b.PublicQuotes,
+			Trail:        ToTrailResponse(b),
 		}
 	}
 	for i, t := range p.Quotes {

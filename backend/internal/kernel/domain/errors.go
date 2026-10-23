@@ -16,6 +16,8 @@ const (
 	KindConflict
 	// KindUnavailable means something the action depends on is unavailable.
 	KindUnavailable
+	// KindForbidden means the caller may not do this.
+	KindForbidden
 )
 
 // DomainError is a business rule violation with a constant, reader-facing
@@ -43,6 +45,8 @@ func NotFound(msg string) *Error { return &Error{kind: KindNotFound, msg: msg} }
 func Conflict(msg string) *Error { return &Error{kind: KindConflict, msg: msg} }
 
 func Unavailable(msg string) *Error { return &Error{kind: KindUnavailable, msg: msg} }
+
+func Forbidden(msg string) *Error { return &Error{kind: KindForbidden, msg: msg} }
 
 // ErrNotFound is returned for anything that does not exist or is not the
 // caller's to see.

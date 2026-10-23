@@ -28,6 +28,8 @@ func (r CreateRequest) ToDraft() domain.Draft {
 	}
 }
 
+// PatchRequest has no passage_hidden: the publishing rules decide it, and
+// decoding rejects the unknown field.
 type PatchRequest struct {
 	Reaction   *string `json:"reaction"`
 	Visibility *string `json:"visibility"`
@@ -53,6 +55,9 @@ type QuoteResponse struct {
 	Reaction      string                   `json:"reaction"`
 	Source        string                   `json:"source"`
 	Visibility    string                   `json:"visibility"`
+	PassageHidden bool                     `json:"passage_hidden"`
+	RemovedAt     *time.Time               `json:"removed_at"`
+	RemovedReason string                   `json:"removed_reason"`
 	CreatedAt     time.Time                `json:"created_at"`
 	UpdatedAt     time.Time                `json:"updated_at"`
 	Work          catalogconv.WorkResponse `json:"work"`
@@ -70,6 +75,9 @@ func ToQuoteResponse(q domain.Quote) QuoteResponse {
 		Reaction:      q.Reaction,
 		Source:        string(q.Source),
 		Visibility:    string(q.Visibility),
+		PassageHidden: q.PassageHidden,
+		RemovedAt:     q.RemovedAt,
+		RemovedReason: q.RemovedReason,
 		CreatedAt:     q.CreatedAt,
 		UpdatedAt:     q.UpdatedAt,
 		Work:          catalogconv.ToWorkResponse(q.Work),

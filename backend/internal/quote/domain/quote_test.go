@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -52,6 +53,13 @@ func TestCheckPatch(t *testing.T) {
 	cited := Quote{Text: "To be", Location: "Act 3", Reaction: "Mine", Visibility: VisibilityPrivate}
 	uncited := Quote{Text: "To be", Reaction: "Mine", Visibility: VisibilityPrivate}
 	public := Quote{Text: "To be", Location: "Act 3", Reaction: "Mine", Visibility: VisibilityPublic}
+	removedAt := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	removed := cited
+	removed.RemovedAt, removed.RemovedReason = &removedAt, "copyright"
+	removedUncited := uncited
+	removedUncited.RemovedAt = &removedAt
+	removedPublic := public
+	removedPublic.RemovedAt = &removedAt
 	tests := []struct {
 		name  string
 		quote Quote
@@ -65,6 +73,11 @@ func TestCheckPatch(t *testing.T) {
 		{"unpublish and clear the reaction", public, Patch{Visibility: ptr(VisibilityPrivate), Reaction: ptr("")}, nil},
 		{"unknown visibility", cited, Patch{Visibility: ptr(Visibility("friends"))}, ErrInvalidVisibility},
 		{"reaction too long", cited, Patch{Reaction: ptr(strings.Repeat("a", MaxReactionLength+1))}, ErrReactionTooLong},
+		{"publish a removed quote", removed, Patch{Visibility: ptr(VisibilityPublic)}, ErrRemoved},
+		{"removal is checked before the publishing rules", removedUncited, Patch{Visibility: ptr(VisibilityPublic)}, ErrRemoved},
+		{"edit the reaction of a removed quote", removed, Patch{Reaction: ptr("Still mine")}, nil},
+		{"keep a removed quote private", removed, Patch{Visibility: ptr(VisibilityPrivate)}, nil},
+		{"unpublish a removed public quote", removedPublic, Patch{Visibility: ptr(VisibilityPrivate)}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,5 +85,73 @@ func TestCheckPatch(t *testing.T) {
 				t.Errorf("CheckPatch() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestQuoteVisibility(t *testing.T) {
+	removedAt := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name                  string
+		quote                 Quote
+		wantRemoved, wantSeen bool
+	}{
+		{"private", Quote{Visibility: VisibilityPrivate}, false, false},
+		{"public", Quote{Visibility: VisibilityPublic}, false, true},
+		{"public but removed", Quote{Visibility: VisibilityPublic, RemovedAt: &removedAt}, true, false},
+		{"private and removed", Quote{Visibility: VisibilityPrivate, RemovedAt: &removedAt}, true, false},
+		{"public with a collapsed passage", Quote{Visibility: VisibilityPublic, PassageHidden: true}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.quote.Removed() != tt.wantRemoved || tt.quote.IsPublic() != tt.wantSeen {
+				t.Errorf("Removed() = %v, IsPublic() = %v; want %v, %v",
+					tt.quote.Removed(), tt.quote.IsPublic(), tt.wantRemoved, tt.wantSeen)
+			}
+		})
+	}
+}
+
+func TestPublishes(t *testing.T) {
+	private, public := Quote{Visibility: VisibilityPrivate}, Quote{Visibility: VisibilityPublic}
+	tests := []struct {
+		name  string
+		quote Quote
+		patch Patch
+		want  bool
+	}{
+		{"publish a private quote", private, Patch{Visibility: ptr(VisibilityPublic)}, true},
+		{"publish a public quote again", public, Patch{Visibility: ptr(VisibilityPublic)}, false},
+		{"unpublish", public, Patch{Visibility: ptr(VisibilityPrivate)}, false},
+		{"edit the reaction only", private, Patch{Reaction: ptr("x")}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.quote.Publishes(tt.patch); got != tt.want {
+				t.Errorf("Publishes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestForPublic(t *testing.T) {
+	removedAt := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	shown := Quote{ID: "q1", Text: "To be", Reaction: "Mine", Location: "Act 3", Visibility: VisibilityPublic,
+		RemovedAt: &removedAt, RemovedReason: "copyright"}
+	got := shown.ForPublic()
+	if got.Text != "To be" || got.Reaction != "Mine" || got.Location != "Act 3" {
+		t.Errorf("shown passage: ForPublic() = %#v, want text, reaction and citation kept", got)
+	}
+	if got.RemovedAt != nil || got.RemovedReason != "" {
+		t.Errorf("ForPublic() keeps the removal details %v %q; only the owner sees them", got.RemovedAt, got.RemovedReason)
+	}
+
+	collapsed := shown
+	collapsed.PassageHidden = true
+	got = collapsed.ForPublic()
+	if got.Text != "" || !got.PassageHidden || got.Reaction != "Mine" || got.Location != "Act 3" {
+		t.Errorf("collapsed passage: ForPublic() = %#v, want the text blanked and the reaction and citation kept", got)
+	}
+	if collapsed.Text != "To be" || collapsed.RemovedReason != "copyright" {
+		t.Error("ForPublic() changed the quote it was called on")
 	}
 }

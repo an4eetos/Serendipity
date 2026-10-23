@@ -14,11 +14,14 @@ type ProfileRepository interface {
 	// Update applies p. It returns domain.ErrUsernameTaken or
 	// domain.ErrInvalidField when the profile would break a constraint.
 	Update(ctx context.Context, id string, p domain.Patch) (domain.Profile, error)
+	// AcceptTerms records that the reader accepted version now.
+	AcceptTerms(ctx context.Context, id, version string) (domain.Profile, error)
 }
 
 // ShelfRepository reads what a profile shows of the reader's library.
 type ShelfRepository interface {
-	// Books lists the reader's books, most recently updated first.
+	// Books lists the reader's books, most recently updated first, with the
+	// count and reading trail of each book's listed quotes.
 	Books(ctx context.Context, userID string) ([]domain.PublicBook, error)
 	// TopCategories lists the subjects most of the reader's books share.
 	TopCategories(ctx context.Context, userID string, limit int) ([]domain.Category, error)

@@ -170,14 +170,17 @@ export function KindleImport({ onImported }: { onImported: () => void }) {
   const [result, setResult] = useState<KindleImportResult>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [owned, setOwned] = useState(false);
 
   async function upload(file: File) {
+    if (!owned) return;
     setBusy(true);
     setError(undefined);
     setResult(undefined);
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("ownership_confirmed", "true");
       setResult(await api<KindleImportResult>("/imports/kindle", { method: "POST", body: form }));
       onImported();
     } catch (e) {
@@ -194,11 +197,21 @@ export function KindleImport({ onImported }: { onImported: () => void }) {
       <p className="mt-1 text-sm text-muted">
         Connect your Kindle by USB and pick <code>documents/My Clippings.txt</code>. Highlights come in private.
       </p>
+      <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={owned}
+          disabled={busy}
+          onChange={(e) => setOwned(e.target.checked)}
+          className="accent-accent"
+        />
+        I own the books these highlights come from
+      </label>
       <input
         ref={input}
         type="file"
         accept=".txt,text/plain"
-        disabled={busy}
+        disabled={busy || !owned}
         onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
         className="mt-3 text-sm file:mr-3 file:rounded-md file:border file:border-line file:bg-card file:px-3 file:py-1.5"
       />
@@ -236,8 +249,10 @@ export function BookRow({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [owned, setOwned] = useState(false);
 
   async function upload(file: File) {
+    if (!owned) return;
     const type = fileTypeOf(file);
     if (!type) {
       setError("Only EPUB and PDF files are supported.");
@@ -254,7 +269,9 @@ export function BookRow({
           contentType: type === "epub" ? "application/epub+zip" : "application/pdf",
         });
       if (error) throw error;
-      onChange(await patch<LibraryItem>(`/library/${item.id}`, { file_path: path, file_type: type }));
+      onChange(
+        await patch<LibraryItem>(`/library/${item.id}`, { file_path: path, file_type: type, ownership_confirmed: true }),
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -283,7 +300,17 @@ export function BookRow({
           <Link href={`/read/${item.id}`} className="btn">
             {item.file_path ? "Read" : "Quotes"}
           </Link>
-          <button className="btn" disabled={busy} onClick={() => input.current?.click()}>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={owned}
+              disabled={busy}
+              onChange={(e) => setOwned(e.target.checked)}
+              className="accent-accent"
+            />
+            I own this copy
+          </label>
+          <button className="btn" disabled={busy || !owned} onClick={() => input.current?.click()}>
             {busy ? "Uploading…" : item.file_path ? "Replace file" : "Upload your copy (EPUB/PDF)"}
           </button>
           <input

@@ -22,6 +22,7 @@ var App = fx.Options(
 	Discussion,
 	KindleImport,
 	Profile,
+	Moderation,
 )
 
 // newFxLogger logs Fx's own lifecycle at debug level and its errors as

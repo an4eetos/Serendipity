@@ -5,7 +5,21 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
+	"unicode/utf8"
+)
+
+const (
+	defaultTermsVersion  = "draft-2026-10"
+	defaultPublicWordCap = 2500
+	// maxTermsVersionLength is the limit of profiles.terms_version.
+	maxTermsVersionLength = 64
+)
+
+var (
+	errTermsVersion  = errors.New("TERMS_VERSION must be 1 to 64 characters")
+	errPublicWordCap = errors.New("PUBLIC_WORD_CAP must be a positive whole number")
 )
 
 type Config struct {
@@ -13,6 +27,8 @@ type Config struct {
 	Database  Database
 	Supabase  Supabase
 	Anthropic Anthropic
+	Terms     Terms
+	Coverage  Coverage
 }
 
 type HTTP struct {
@@ -39,6 +55,19 @@ type Anthropic struct {
 	Model string
 }
 
+// Terms is the current terms of service.
+type Terms struct {
+	// Version is the version readers must accept before they write.
+	Version string
+}
+
+// Coverage limits how much of one work can be public.
+type Coverage struct {
+	// PublicWordCap is the default number of distinct words of one work
+	// that may be public; a work's own override takes precedence.
+	PublicWordCap int
+}
+
 // Load reads the configuration from the environment.
 func Load() (Config, error) {
 	c := Config{
@@ -57,6 +86,16 @@ func Load() (Config, error) {
 			Model:  env("ANTHROPIC_MODEL", "claude-opus-5-5"),
 		},
 	}
+	version, err := termsVersion(os.LookupEnv("TERMS_VERSION"))
+	if err != nil {
+		return c, err
+	}
+	c.Terms = Terms{Version: version}
+	wordCap, err := publicWordCap(os.Getenv("PUBLIC_WORD_CAP"))
+	if err != nil {
+		return c, err
+	}
+	c.Coverage = Coverage{PublicWordCap: wordCap}
 	var missing []string
 	for _, v := range []struct{ name, value string }{
 		{"DATABASE_URL", c.Database.URL},
@@ -71,6 +110,33 @@ func Load() (Config, error) {
 		return c, errors.New("missing required env: " + strings.Join(missing, ", "))
 	}
 	return c, nil
+}
+
+// termsVersion reads TERMS_VERSION: unset means the default. A set value is
+// trimmed and must fit profiles.terms_version, which holds 1 to 64
+// characters once accepted.
+func termsVersion(raw string, set bool) (string, error) {
+	if !set {
+		return defaultTermsVersion, nil
+	}
+	v := strings.TrimSpace(raw)
+	if v == "" || utf8.RuneCountInString(v) > maxTermsVersionLength {
+		return "", errTermsVersion
+	}
+	return v, nil
+}
+
+// publicWordCap parses PUBLIC_WORD_CAP: unset means the default, anything
+// else must be a whole number of at least 1.
+func publicWordCap(raw string) (int, error) {
+	if raw == "" {
+		return defaultPublicWordCap, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, errPublicWordCap
+	}
+	return n, nil
 }
 
 func env(key, fallback string) string {

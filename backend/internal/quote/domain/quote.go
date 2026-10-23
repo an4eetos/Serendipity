@@ -18,6 +18,7 @@ const (
 var (
 	ErrReactionTooLong   = kernel.Invalid("reaction is too long")
 	ErrInvalidVisibility = kernel.Invalid("invalid visibility")
+	ErrRemoved           = kernel.Conflict("a moderator removed this quote, so it can't be made public")
 )
 
 // Source is where a quote came from.
@@ -41,6 +42,7 @@ func (v Visibility) Valid() bool {
 
 type Quote struct {
 	ID            string
+	UserID        string // the reader who owns the quote
 	WorkID        string
 	LibraryItemID *string
 	Text          string
@@ -53,9 +55,46 @@ type Quote struct {
 	Reaction   string
 	Source     Source
 	Visibility Visibility
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Work       catalog.Work
+	// PassageHidden collapses the passage on public pages: the work's public
+	// coverage cap was reached when the quote was published.
+	PassageHidden bool
+	// PassageWords is the passage's length as coverage counts it. The
+	// database computes it.
+	PassageWords int
+	// RemovedAt is when a moderator removed the quote; nil unless removed.
+	RemovedAt *time.Time
+	// RemovedReason tells the owner why the quote was removed.
+	RemovedReason string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Work          catalog.Work
+}
+
+// Removed reports whether a moderator removed the quote.
+func (q Quote) Removed() bool {
+	return q.RemovedAt != nil
+}
+
+// IsPublic reports whether anyone may see the quote: it is public and not
+// removed.
+func (q Quote) IsPublic() bool {
+	return q.Visibility == VisibilityPublic && !q.Removed()
+}
+
+// Publishes reports whether p makes the quote public when it isn't yet.
+func (q Quote) Publishes(p Patch) bool {
+	return p.Visibility != nil && *p.Visibility == VisibilityPublic && q.Visibility != VisibilityPublic
+}
+
+// ForPublic is the quote as public pages show it: a collapsed passage is
+// blanked and the removal details, which only the owner sees, are left out.
+func (q Quote) ForPublic() Quote {
+	if q.PassageHidden {
+		q.Text = ""
+	}
+	q.RemovedAt = nil
+	q.RemovedReason = ""
+	return q
 }
 
 // Draft is a quote that is not stored yet.
@@ -93,11 +132,17 @@ func NewUpload(d Draft) (Draft, error) {
 type Patch struct {
 	Reaction   *string
 	Visibility *Visibility
+	// PassageHidden is decided by the publishing rules in UpdateQuote, never by
+	// the reader: converters must not set it.
+	PassageHidden *bool
 }
 
-// CheckPatch reports whether p may be applied to q: the patched quote must
-// still meet the publishing rules.
+// CheckPatch reports whether p may be applied to q: a removed quote can't be
+// made public, and the patched quote must still meet the publishing rules.
 func (q Quote) CheckPatch(p Patch) error {
+	if p.Visibility != nil && *p.Visibility == VisibilityPublic && q.Removed() {
+		return ErrRemoved
+	}
 	if p.Visibility != nil && !p.Visibility.Valid() {
 		return ErrInvalidVisibility
 	}

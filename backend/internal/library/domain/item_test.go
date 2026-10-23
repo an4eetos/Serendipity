@@ -22,10 +22,15 @@ func TestPatchValidate(t *testing.T) {
 		{"unknown status", Patch{Status: ptr(ReadingStatus("paused"))}, ErrInvalidStatus},
 		{"path without type", Patch{FilePath: ptr(owner + "/a.epub")}, ErrFileFieldsPaired},
 		{"type without path", Patch{FileType: ptr(FileEPUB)}, ErrFileFieldsPaired},
-		{"own file", Patch{FilePath: ptr(owner + "/a.epub"), FileType: ptr(FileEPUB)}, nil},
+		{"own file", Patch{FilePath: ptr(owner + "/a.epub"), FileType: ptr(FileEPUB), OwnershipConfirmed: true}, nil},
+		{"own file without the ownership confirmation", Patch{FilePath: ptr(owner + "/a.epub"), FileType: ptr(FileEPUB)}, ErrOwnershipUnconfirmed},
 		{"someone else's folder", Patch{FilePath: ptr("user-2/a.epub"), FileType: ptr(FileEPUB)}, ErrForeignFile},
+		{"someone else's folder, confirmed", Patch{FilePath: ptr("user-2/a.epub"), FileType: ptr(FileEPUB), OwnershipConfirmed: true}, ErrForeignFile},
 		{"path traversal", Patch{FilePath: ptr(owner + "/../user-2/a.pdf"), FileType: ptr(FilePDF)}, ErrForeignFile},
 		{"unsupported type", Patch{FilePath: ptr(owner + "/a.mobi"), FileType: ptr(FileType("mobi"))}, ErrUnsupportedFile},
+		{"pairing is checked before ownership", Patch{FilePath: ptr(owner + "/a.epub")}, ErrFileFieldsPaired},
+		{"no file needs no confirmation", Patch{Progress: ptr(0.5)}, nil},
+		{"a confirmation without a file", Patch{OwnershipConfirmed: true}, nil},
 		{"first failing rule wins", Patch{Progress: ptr(2.0), Status: ptr(ReadingStatus("x"))}, ErrProgressRange},
 	}
 	for _, tt := range tests {
@@ -34,6 +39,15 @@ func TestPatchValidate(t *testing.T) {
 				t.Errorf("Validate() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCheckOwnershipConfirmed(t *testing.T) {
+	if err := CheckOwnershipConfirmed(false); !errors.Is(err, ErrOwnershipUnconfirmed) {
+		t.Errorf("unconfirmed: err = %v, want ErrOwnershipUnconfirmed", err)
+	}
+	if err := CheckOwnershipConfirmed(true); err != nil {
+		t.Errorf("confirmed: err = %v", err)
 	}
 }
 

@@ -52,11 +52,22 @@ type Message struct {
 // Conversation is a discussion of the reader's reaction to a quote with one
 // character.
 type Conversation struct {
-	ID        string
-	QuoteID   string
-	Persona   Persona
-	Messages  []Message
-	CreatedAt time.Time
+	ID       string
+	UserID   string // the reader who owns the conversation
+	QuoteID  string
+	Persona  Persona
+	Messages []Message
+	// RemovedAt is when a moderator removed the conversation; nil unless
+	// removed.
+	RemovedAt *time.Time
+	// RemovedReason tells the owner why the conversation was removed.
+	RemovedReason string
+	CreatedAt     time.Time
+}
+
+// Removed reports whether a moderator removed the conversation.
+func (c Conversation) Removed() bool {
+	return c.RemovedAt != nil
 }
 
 // Answered reports whether the character has replied at least once.

@@ -19,7 +19,8 @@ import (
 
 // ImportClippings brings a Kindle's highlights into the reader's library,
 // all or nothing: each book becomes a library item, catalogued if it is new,
-// and each highlight a quote. Re-importing the same file adds nothing.
+// and each highlight a quote. Re-importing the same file adds nothing. The
+// reader must confirm they own the copies, and each book records it.
 type ImportClippings struct {
 	txm     kernelports.TxManager
 	works   catalogports.WorkRepository
@@ -36,7 +37,11 @@ func NewImportClippings(
 	return &ImportClippings{txm: txm, works: works, library: library, quotes: quotes}
 }
 
-func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings io.Reader) (domain.Report, error) {
+func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings io.Reader,
+	ownershipConfirmed bool) (domain.Report, error) {
+	if err := library.CheckOwnershipConfirmed(ownershipConfirmed); err != nil {
+		return domain.Report{}, err
+	}
 	books, err := domain.Parse(clippings)
 	if err != nil {
 		return domain.Report{}, err
@@ -47,6 +52,10 @@ func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings
 		for _, b := range books {
 			item, err := uc.libraryItem(ctx, userID, b)
 			if err != nil {
+				return err
+			}
+			if _, err := uc.library.Update(ctx, userID, item.ID,
+				library.Patch{OwnershipConfirmed: true}); err != nil {
 				return err
 			}
 			report.Books++

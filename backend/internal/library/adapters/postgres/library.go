@@ -11,7 +11,8 @@ import (
 )
 
 const itemColumns = `li.id, ` + catalogpg.WorkColumns + `, li.file_path, li.file_type, li.progress, li.status,
-	li.last_location, (select count(*) from quotes q where q.library_item_id = li.id), li.created_at, li.updated_at`
+	li.last_location, (select count(*) from quotes q where q.library_item_id = li.id), li.ownership_confirmed_at,
+	li.created_at, li.updated_at`
 
 const itemFrom = ` from library_items li join works w on w.id = li.work_id `
 
@@ -19,7 +20,7 @@ func scanItem(row interface{ Scan(...any) error }) (domain.Item, error) {
 	var li domain.Item
 	dest := append([]any{&li.ID}, catalogpg.WorkDest(&li.Work)...)
 	dest = append(dest, &li.FilePath, &li.FileType, &li.Progress, &li.Status,
-		&li.LastLocation, &li.QuoteCount, &li.CreatedAt, &li.UpdatedAt)
+		&li.LastLocation, &li.QuoteCount, &li.OwnershipConfirmedAt, &li.CreatedAt, &li.UpdatedAt)
 	err := row.Scan(dest...)
 	return li, err
 }
@@ -82,9 +83,10 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, id string, p dom
 			last_location = coalesce($5, last_location),
 			file_path     = coalesce($6, file_path),
 			file_type     = coalesce($7::file_type, file_type),
+			ownership_confirmed_at = case when $8 then now() else ownership_confirmed_at end,
 			updated_at    = now()
 		where user_id = $1 and id = $2`,
-		userID, id, p.Progress, p.Status, p.LastLocation, p.FilePath, p.FileType)
+		userID, id, p.Progress, p.Status, p.LastLocation, p.FilePath, p.FileType, p.OwnershipConfirmed)
 	if err != nil {
 		return domain.Item{}, err
 	}

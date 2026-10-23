@@ -23,9 +23,25 @@ type ConversationRepository interface {
 	// Get returns a conversation with its persona and messages.
 	Get(ctx context.Context, userID, id string) (domain.Conversation, error)
 	ListForQuote(ctx context.Context, userID, quoteID string) ([]domain.Conversation, error)
+	// ListForQuotes lists the discussions public pages show for these quotes:
+	// removed ones are left out.
 	ListForQuotes(ctx context.Context, userID string, quoteIDs []string) ([]domain.Conversation, error)
 	AppendMessage(ctx context.Context, conversationID string, role domain.Role, content string) (domain.Message, error)
 	DeleteMessage(ctx context.Context, conversationID string, id int64) error
+}
+
+// ConversationModeration is how moderators act on any reader's discussions;
+// it is not scoped to a reader.
+type ConversationModeration interface {
+	// ListAny returns these conversations with persona and messages, removed
+	// ones included; missing ids are left out.
+	ListAny(ctx context.Context, ids []string) ([]domain.Conversation, error)
+	// Remove sets removed_at/removed_reason. It returns kernel.ErrNotFound
+	// unless the conversation exists and isn't removed.
+	Remove(ctx context.Context, id, reason string) error
+	// Restore clears them. It returns kernel.ErrNotFound unless the
+	// conversation exists and is removed.
+	Restore(ctx context.Context, id string) error
 }
 
 // CharacterModel generates characters' replies.

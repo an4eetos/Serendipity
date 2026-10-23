@@ -15,20 +15,26 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/an4eetos/serendipity/backend/infra/config"
-	"github.com/an4eetos/serendipity/backend/internal/identity/adapters/middleware"
+	identitymw "github.com/an4eetos/serendipity/backend/internal/identity/adapters/middleware"
 	"github.com/an4eetos/serendipity/backend/internal/kernel/adapters/httpapi"
+	moderationmw "github.com/an4eetos/serendipity/backend/internal/moderation/adapters/middleware"
+	profilemw "github.com/an4eetos/serendipity/backend/internal/profile/adapters/middleware"
 )
 
 type RouterParams struct {
 	fx.In
 
 	Config config.Config
-	Auth   *middleware.Auth
+	Auth   *identitymw.Auth
+	Terms  *profilemw.Terms
+	Admin  *moderationmw.Admin
 	Routes []httpapi.Routes `group:"routes"`
 }
 
 // NewRouter mounts every bounded context's routes behind the shared
-// middleware.
+// middleware: public routes take an optional token, private ones a token
+// and, for anything but reads, the current terms; terms routes only a token;
+// admin routes a token and an admin.
 func NewRouter(p RouterParams) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID, chimw.RealIP, chimw.Logger, chimw.Recoverer)
@@ -41,9 +47,18 @@ func NewRouter(p RouterParams) http.Handler {
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 
-	public, private := r.With(p.Auth.Optional), r.With(p.Auth.Require)
+	signedIn := r.With(p.Auth.Require)
+	public := r.With(p.Auth.Optional)
+	private := signedIn.With(p.Terms.Gate)
+	admin := signedIn.With(p.Admin.Require)
 	for _, routes := range p.Routes {
 		routes.RegisterRoutes(public, private)
+		if tr, ok := routes.(httpapi.TermsRoutes); ok {
+			tr.RegisterTermsRoutes(signedIn)
+		}
+		if ar, ok := routes.(httpapi.AdminRoutes); ok {
+			ar.RegisterAdminRoutes(admin)
+		}
 	}
 	return r
 }

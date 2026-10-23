@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	discussion "github.com/an4eetos/serendipity/backend/internal/discussion/domain"
 	discussionports "github.com/an4eetos/serendipity/backend/internal/discussion/ports"
@@ -17,14 +18,20 @@ import (
 func ptr[T any](v T) *T { return &v }
 
 type fakeProfiles struct {
+	byID      map[string]domain.Profile
 	byName    map[string]domain.Profile
 	lookedUp  string
 	patches   []domain.Patch
+	accepted  []string // the versions AcceptTerms recorded
 	outsideTx bool
 }
 
-func (f *fakeProfiles) Get(context.Context, string) (domain.Profile, error) {
-	return domain.Profile{}, kernel.ErrNotFound
+func (f *fakeProfiles) Get(_ context.Context, id string) (domain.Profile, error) {
+	p, ok := f.byID[id]
+	if !ok {
+		return domain.Profile{}, kernel.ErrNotFound
+	}
+	return p, nil
 }
 
 func (f *fakeProfiles) GetByUsername(_ context.Context, username string) (domain.Profile, error) {
@@ -40,6 +47,18 @@ func (f *fakeProfiles) Update(ctx context.Context, id string, p domain.Patch) (d
 	f.outsideTx = f.outsideTx || !portstest.InTx(ctx)
 	f.patches = append(f.patches, p)
 	return domain.Profile{ID: id, Username: *p.Username}, nil
+}
+
+func (f *fakeProfiles) AcceptTerms(ctx context.Context, id, version string) (domain.Profile, error) {
+	f.outsideTx = f.outsideTx || !portstest.InTx(ctx)
+	p, ok := f.byID[id]
+	if !ok {
+		return domain.Profile{}, kernel.ErrNotFound
+	}
+	f.accepted = append(f.accepted, version)
+	p.TermsVersion, p.TermsAcceptedAt = version, ptr(time.Now())
+	f.byID[id] = p
+	return p, nil
 }
 
 type fakeShelf struct {

@@ -58,6 +58,8 @@ func StatusOf(err kernel.DomainError) int {
 		return http.StatusConflict
 	case kernel.KindUnavailable:
 		return http.StatusBadGateway
+	case kernel.KindForbidden:
+		return http.StatusForbidden
 	}
 	return http.StatusInternalServerError
 }

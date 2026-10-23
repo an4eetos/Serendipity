@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"errors"
+	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -27,6 +29,9 @@ func (f *fakeWorks) Ensure(_ context.Context, w catalog.Work, _ string) (catalog
 type fakeLibrary struct {
 	libraryports.LibraryRepository
 	byTitle map[string]library.Item
+	// updated maps the items Update was called on to their patches.
+	updated   map[string]library.Patch
+	outsideTx bool
 }
 
 func (f *fakeLibrary) FindByTitle(_ context.Context, _, title string) (library.Item, error) {
@@ -40,6 +45,15 @@ func (f *fakeLibrary) FindByTitle(_ context.Context, _, title string) (library.I
 func (f *fakeLibrary) Add(_ context.Context, _, workID string) (library.Item, error) {
 	it := library.Item{ID: "item-" + workID, Work: catalog.Work{ID: workID}}
 	return it, nil
+}
+
+func (f *fakeLibrary) Update(ctx context.Context, _, id string, p library.Patch) (library.Item, error) {
+	f.outsideTx = f.outsideTx || !portstest.InTx(ctx)
+	if f.updated == nil {
+		f.updated = map[string]library.Patch{}
+	}
+	f.updated[id] = p
+	return library.Item{ID: id}, nil
 }
 
 // fakeQuotes treats texts it has seen as duplicates.
@@ -78,7 +92,7 @@ func TestImportClippings(t *testing.T) {
 	}}
 	quotes := &fakeQuotes{seen: map[string]bool{"You have power over your mind.": true}}
 
-	report, err := NewImportClippings(txm, works, lib, quotes).Execute(t.Context(), "u1", strings.NewReader(file))
+	report, err := NewImportClippings(txm, works, lib, quotes).Execute(t.Context(), "u1", strings.NewReader(file), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,15 +107,51 @@ func TestImportClippings(t *testing.T) {
 	if d.WorkID != "work-The Republic" || *d.LibraryItemID != "item-work-The Republic" || d.Source != quote.SourceKindle || d.Location != "Page 12 · Loc 170-172" {
 		t.Errorf("imported %#v", d)
 	}
-	if txm.Calls != 1 || quotes.outsideTx {
-		t.Errorf("transactions = %d, writes outside one: %v; the import must be all or nothing", txm.Calls, quotes.outsideTx)
+	if txm.Calls != 1 || quotes.outsideTx || lib.outsideTx {
+		t.Errorf("transactions = %d, writes outside one: quotes %v, library %v; the import must be all or nothing",
+			txm.Calls, quotes.outsideTx, lib.outsideTx)
+	}
+	// Each book of the file records the confirmation, new or already in the
+	// library, and the patch changes nothing else.
+	wantUpdates := map[string]library.Patch{
+		"item-work-The Republic": {OwnershipConfirmed: true},
+		"item-med":               {OwnershipConfirmed: true},
+	}
+	if !reflect.DeepEqual(lib.updated, wantUpdates) {
+		t.Errorf("library updates = %#v, want %#v", lib.updated, wantUpdates)
+	}
+}
+
+// countingReader counts how often the import reads the file.
+type countingReader struct {
+	r     io.Reader
+	reads int
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	c.reads++
+	return c.r.Read(p)
+}
+
+func TestImportClippingsNeedsOwnershipConfirmation(t *testing.T) {
+	txm := &portstest.TxManager{}
+	lib, quotes := &fakeLibrary{}, &fakeQuotes{seen: map[string]bool{}}
+	file := &countingReader{r: strings.NewReader(clipping("Book (Author)", "- Your Highlight at location 1", "Text."))}
+
+	_, err := NewImportClippings(txm, &fakeWorks{}, lib, quotes).Execute(t.Context(), "u1", file, false)
+	if !errors.Is(err, library.ErrOwnershipUnconfirmed) {
+		t.Fatalf("err = %v, want library.ErrOwnershipUnconfirmed", err)
+	}
+	if file.reads != 0 || txm.Calls != 0 || len(lib.updated) != 0 || len(quotes.drafts) != 0 {
+		t.Errorf("reads %d, transactions %d, library updates %d, quotes %d; want the file left unread and nothing written",
+			file.reads, txm.Calls, len(lib.updated), len(quotes.drafts))
 	}
 }
 
 func TestImportClippingsUnreadable(t *testing.T) {
 	txm := &portstest.TxManager{}
 	huge := clipping("Book (Author)", "- Your Highlight at location 1", strings.Repeat("a", 5<<20))
-	_, err := NewImportClippings(txm, &fakeWorks{}, &fakeLibrary{}, &fakeQuotes{}).Execute(t.Context(), "u1", strings.NewReader(huge))
+	_, err := NewImportClippings(txm, &fakeWorks{}, &fakeLibrary{}, &fakeQuotes{}).Execute(t.Context(), "u1", strings.NewReader(huge), true)
 	if !errors.Is(err, domain.ErrUnreadable) || txm.Calls != 0 {
 		t.Errorf("err = %v, transactions = %d", err, txm.Calls)
 	}

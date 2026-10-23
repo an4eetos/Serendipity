@@ -47,7 +47,19 @@ var (
 	ErrForeignFile      = kernel.Invalid("file must be in your own folder")
 	ErrUnsupportedFile  = kernel.Invalid("only EPUB and PDF files are supported")
 	ErrNoFile           = kernel.NotFound("no file uploaded for this book")
+	// ErrOwnershipUnconfirmed is returned when a reader uploads or imports
+	// from a copy without confirming they own it.
+	ErrOwnershipUnconfirmed = kernel.Invalid("confirm that you own this copy first")
 )
+
+// CheckOwnershipConfirmed requires the reader's confirmation that they own
+// the copy they upload or import from.
+func CheckOwnershipConfirmed(confirmed bool) error {
+	if !confirmed {
+		return ErrOwnershipUnconfirmed
+	}
+	return nil
+}
 
 // Item is a reader's copy of a work.
 type Item struct {
@@ -59,8 +71,11 @@ type Item struct {
 	Status       ReadingStatus
 	LastLocation *string
 	QuoteCount   int
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// OwnershipConfirmedAt is the latest time the reader confirmed they own
+	// the copy, nil if they never did.
+	OwnershipConfirmedAt *time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // UploadedFile returns where the reader's own copy is stored.
@@ -84,6 +99,9 @@ type Patch struct {
 	LastLocation *string
 	FilePath     *string
 	FileType     *FileType
+	// OwnershipConfirmed records that the reader confirmed they own the
+	// copy; it is required to set a file.
+	OwnershipConfirmed bool
 }
 
 // Validate checks a patch made by the item's owner.
@@ -105,6 +123,7 @@ func (p Patch) Validate(ownerID string) error {
 		if !p.FileType.Valid() {
 			return ErrUnsupportedFile
 		}
+		return CheckOwnershipConfirmed(p.OwnershipConfirmed)
 	}
 	return nil
 }

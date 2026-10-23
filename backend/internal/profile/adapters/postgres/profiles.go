@@ -9,11 +9,12 @@ import (
 	"github.com/an4eetos/serendipity/backend/internal/profile/domain"
 )
 
-const profileColumns = `id, username, display_name, bio, is_public, created_at`
+const profileColumns = `id, username, display_name, bio, is_public, terms_version, terms_accepted_at, created_at`
 
 func scanProfile(row interface{ Scan(...any) error }) (domain.Profile, error) {
 	var p domain.Profile
-	err := row.Scan(&p.ID, &p.Username, &p.DisplayName, &p.Bio, &p.IsPublic, &p.CreatedAt)
+	err := row.Scan(&p.ID, &p.Username, &p.DisplayName, &p.Bio, &p.IsPublic, &p.TermsVersion, &p.TermsAcceptedAt,
+		&p.CreatedAt)
 	return p, err
 }
 
@@ -51,4 +52,12 @@ func (r *ProfileRepository) Update(ctx context.Context, id string, p domain.Patc
 		return domain.Profile{}, domain.ErrInvalidField
 	}
 	return prof, err
+}
+
+func (r *ProfileRepository) AcceptTerms(ctx context.Context, id, version string) (domain.Profile, error) {
+	return scanProfile(r.db.QueryRow(ctx, `
+		update profiles set terms_version = $2, terms_accepted_at = now()
+		where id = $1
+		returning `+profileColumns,
+		id, version))
 }

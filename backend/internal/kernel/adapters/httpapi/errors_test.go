@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,6 +23,8 @@ func TestWriteError(t *testing.T) {
 		{"not found", kernel.ErrNotFound, http.StatusNotFound, `{"error":"not found"}`},
 		{"conflict", kernel.Conflict("taken"), http.StatusConflict, `{"error":"taken"}`},
 		{"unavailable", errDown, http.StatusBadGateway, `{"error":"search is down"}`},
+		{"forbidden", kernel.Forbidden("admins only"), http.StatusForbidden, `{"error":"admins only"}`},
+		{"wrapped forbidden", fmt.Errorf("gate: %w", kernel.Forbidden("accept the terms")), http.StatusForbidden, `{"error":"accept the terms"}`},
 		{"joined domain error keeps its message", errors.Join(errDown, errors.New("dial tcp")), http.StatusBadGateway, `{"error":"search is down"}`},
 		{"unexpected", errors.New("boom"), http.StatusInternalServerError, `{"error":"internal error"}`},
 	}
@@ -39,5 +42,26 @@ func TestWriteError(t *testing.T) {
 				t.Errorf("Content-Type = %q", ct)
 			}
 		})
+	}
+}
+
+func TestForbiddenKind(t *testing.T) {
+	err := kernel.Forbidden("no")
+	if err.Kind() != kernel.KindForbidden || err.Error() != "no" {
+		t.Errorf("Forbidden() = kind %v, message %q", err.Kind(), err.Error())
+	}
+	if got := StatusOf(err); got != http.StatusForbidden {
+		t.Errorf("StatusOf(Forbidden) = %d, want 403", got)
+	}
+	// The new kind didn't shift the existing ones.
+	for kind, want := range map[kernel.DomainError]int{
+		kernel.Invalid("x"):     http.StatusBadRequest,
+		kernel.ErrNotFound:      http.StatusNotFound,
+		kernel.Conflict("x"):    http.StatusConflict,
+		kernel.Unavailable("x"): http.StatusBadGateway,
+	} {
+		if got := StatusOf(kind); got != want {
+			t.Errorf("StatusOf(%v) = %d, want %d", kind, got, want)
+		}
 	}
 }

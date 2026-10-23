@@ -4,14 +4,21 @@ import (
 	"context"
 
 	"github.com/an4eetos/serendipity/backend/internal/discussion/domain"
+	"github.com/an4eetos/serendipity/backend/internal/discussion/ports"
 	kernelpg "github.com/an4eetos/serendipity/backend/internal/kernel/adapters/postgres"
 	kernel "github.com/an4eetos/serendipity/backend/internal/kernel/domain"
 )
 
-// ConversationRepository implements ports.ConversationRepository.
+// ConversationRepository implements ports.ConversationRepository and, for
+// moderators, ports.ConversationModeration.
 type ConversationRepository struct {
 	db *kernelpg.DB
 }
+
+var (
+	_ ports.ConversationRepository = (*ConversationRepository)(nil)
+	_ ports.ConversationModeration = (*ConversationRepository)(nil)
+)
 
 func NewConversationRepository(db *kernelpg.DB) *ConversationRepository {
 	return &ConversationRepository{db: db}
@@ -59,14 +66,48 @@ func (r *ConversationRepository) ListForQuote(ctx context.Context, userID, quote
 }
 
 func (r *ConversationRepository) ListForQuotes(ctx context.Context, userID string, quoteIDs []string) ([]domain.Conversation, error) {
-	return r.list(ctx, `c.user_id = $1 and c.quote_id = any($2::uuid[])`, userID, quoteIDs)
+	return r.list(ctx, `c.user_id = $1 and c.quote_id = any($2::uuid[]) and c.removed_at is null`, userID, quoteIDs)
+}
+
+// ListAny returns the conversations with these ids, whoever owns them.
+func (r *ConversationRepository) ListAny(ctx context.Context, ids []string) ([]domain.Conversation, error) {
+	if len(ids) == 0 {
+		return []domain.Conversation{}, nil
+	}
+	return r.list(ctx, `c.id = any($1::uuid[])`, ids)
+}
+
+func (r *ConversationRepository) Remove(ctx context.Context, id, reason string) error {
+	tag, err := r.db.Exec(ctx, `
+		update conversations set removed_at = now(), removed_reason = $2
+		where id = $1 and removed_at is null`, id, reason)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return kernel.ErrNotFound
+	}
+	return nil
+}
+
+func (r *ConversationRepository) Restore(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `
+		update conversations set removed_at = null, removed_reason = ''
+		where id = $1 and removed_at is not null`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return kernel.ErrNotFound
+	}
+	return nil
 }
 
 // list returns the conversations matching where, oldest first, with their
 // personas and messages.
 func (r *ConversationRepository) list(ctx context.Context, where string, args ...any) ([]domain.Conversation, error) {
 	rows, err := r.db.Query(ctx, `
-		select c.id, c.quote_id, c.created_at, `+personaColumns+`
+		select c.id, c.user_id, c.quote_id, c.removed_at, c.removed_reason, c.created_at, `+personaColumns+`
 		from conversations c join personas p on p.id = c.persona_id
 		where `+where+` order by c.created_at`, args...)
 	if err != nil {
@@ -76,7 +117,8 @@ func (r *ConversationRepository) list(ctx context.Context, where string, args ..
 	ids := []string{}
 	for rows.Next() {
 		var c domain.Conversation
-		dest := append([]any{&c.ID, &c.QuoteID, &c.CreatedAt}, personaDest(&c.Persona)...)
+		dest := append([]any{&c.ID, &c.UserID, &c.QuoteID, &c.RemovedAt, &c.RemovedReason, &c.CreatedAt},
+			personaDest(&c.Persona)...)
 		if err := rows.Scan(dest...); err != nil {
 			rows.Close()
 			return nil, err

@@ -31,15 +31,21 @@ func (r AddBookRequest) ToWork() catalog.Work {
 }
 
 type PatchRequest struct {
-	Progress     *float64 `json:"progress"`
-	Status       *string  `json:"status"`
-	LastLocation *string  `json:"last_location"`
-	FilePath     *string  `json:"file_path"`
-	FileType     *string  `json:"file_type"`
+	Progress           *float64 `json:"progress"`
+	Status             *string  `json:"status"`
+	LastLocation       *string  `json:"last_location"`
+	FilePath           *string  `json:"file_path"`
+	FileType           *string  `json:"file_type"`
+	OwnershipConfirmed bool     `json:"ownership_confirmed"`
 }
 
 func (r PatchRequest) ToPatch() domain.Patch {
-	p := domain.Patch{Progress: r.Progress, LastLocation: r.LastLocation, FilePath: r.FilePath}
+	p := domain.Patch{
+		Progress:           r.Progress,
+		LastLocation:       r.LastLocation,
+		FilePath:           r.FilePath,
+		OwnershipConfirmed: r.OwnershipConfirmed,
+	}
 	if r.Status != nil {
 		s := domain.ReadingStatus(*r.Status)
 		p.Status = &s
@@ -52,29 +58,31 @@ func (r PatchRequest) ToPatch() domain.Patch {
 }
 
 type ItemResponse struct {
-	ID           string                   `json:"id"`
-	Work         catalogconv.WorkResponse `json:"work"`
-	FilePath     *string                  `json:"file_path"`
-	FileType     *string                  `json:"file_type"`
-	Progress     float64                  `json:"progress"`
-	Status       string                   `json:"status"`
-	LastLocation *string                  `json:"last_location"`
-	QuoteCount   int                      `json:"quote_count"`
-	CreatedAt    time.Time                `json:"created_at"`
-	UpdatedAt    time.Time                `json:"updated_at"`
+	ID                   string                   `json:"id"`
+	Work                 catalogconv.WorkResponse `json:"work"`
+	FilePath             *string                  `json:"file_path"`
+	FileType             *string                  `json:"file_type"`
+	Progress             float64                  `json:"progress"`
+	Status               string                   `json:"status"`
+	LastLocation         *string                  `json:"last_location"`
+	QuoteCount           int                      `json:"quote_count"`
+	OwnershipConfirmedAt *time.Time               `json:"ownership_confirmed_at"`
+	CreatedAt            time.Time                `json:"created_at"`
+	UpdatedAt            time.Time                `json:"updated_at"`
 }
 
 func ToItemResponse(it domain.Item) ItemResponse {
 	resp := ItemResponse{
-		ID:           it.ID,
-		Work:         catalogconv.ToWorkResponse(it.Work),
-		FilePath:     it.FilePath,
-		Progress:     it.Progress,
-		Status:       string(it.Status),
-		LastLocation: it.LastLocation,
-		QuoteCount:   it.QuoteCount,
-		CreatedAt:    it.CreatedAt,
-		UpdatedAt:    it.UpdatedAt,
+		ID:                   it.ID,
+		Work:                 catalogconv.ToWorkResponse(it.Work),
+		FilePath:             it.FilePath,
+		Progress:             it.Progress,
+		Status:               string(it.Status),
+		LastLocation:         it.LastLocation,
+		QuoteCount:           it.QuoteCount,
+		OwnershipConfirmedAt: it.OwnershipConfirmedAt,
+		CreatedAt:            it.CreatedAt,
+		UpdatedAt:            it.UpdatedAt,
 	}
 	if it.FileType != nil {
 		ft := string(*it.FileType)

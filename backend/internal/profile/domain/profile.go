@@ -24,7 +24,12 @@ type Profile struct {
 	DisplayName string
 	Bio         string
 	IsPublic    bool
-	CreatedAt   time.Time
+	// TermsVersion is the version of the terms of service the reader last
+	// accepted; "" until they accept one.
+	TermsVersion string
+	// TermsAcceptedAt is when they accepted it; nil until then.
+	TermsAcceptedAt *time.Time
+	CreatedAt       time.Time
 }
 
 // VisibleTo reports whether viewerID ("" if anonymous) may see the profile:

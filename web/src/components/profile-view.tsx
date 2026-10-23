@@ -1,11 +1,16 @@
 // Renders a public profile. Used by the server page and by the owner's
 // client-side preview of a private profile, so it must not use hooks.
 import type { PublicProfile } from "@/lib/types";
+import { ReadingTrail } from "./reading-trail";
+import { ReportButton } from "./report-button";
 
 const statusLabel = { reading: "Reading", finished: "Finished", abandoned: "Set aside" } as const;
 
 export function ProfileView({ data, preview = false }: { data: PublicProfile; preview?: boolean }) {
   const { profile, categories, books, quotes } = data;
+  // Trails cover every public quote, but only the shown ones have an article to link to.
+  const shown = new Set(quotes.map((q) => q.id));
+  const trails = books.filter((b) => b.public_quotes > 0 && (b.trail.points.length > 0 || b.trail.unplaced > 0));
   return (
     <div className="space-y-10">
       <header>
@@ -61,13 +66,38 @@ export function ProfileView({ data, preview = false }: { data: PublicProfile; pr
         </section>
       )}
 
+      {trails.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-medium text-muted">Reading trail</h2>
+          <ul className="space-y-4">
+            {trails.map((b) => (
+              <li key={b.work.id}>
+                <p className="mb-1 truncate text-sm font-medium">{b.work.title}</p>
+                <ReadingTrail
+                  dots={b.trail.points.map((p) => ({
+                    id: p.quote_id,
+                    position: p.position,
+                    href: shown.has(p.quote_id) ? `#quote-${p.quote_id}` : undefined,
+                  }))}
+                  unplaced={b.trail.unplaced}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="space-y-6">
         <h2 className="text-sm font-medium text-muted">Quotes</h2>
         {quotes.length === 0 && <p className="text-muted">No public quotes yet.</p>}
         {quotes.map((q) => (
-          <article key={q.id} className="card space-y-4 p-5">
+          <article key={q.id} id={`quote-${q.id}`} className="card scroll-mt-4 space-y-4 p-5">
             <blockquote className="border-l-2 border-accent pl-4">
-              <p className="quote-text whitespace-pre-wrap">{q.text}</p>
+              {q.passage_hidden ? (
+                <p className="text-sm italic text-muted">Passage hidden: this book&apos;s public quota is full.</p>
+              ) : (
+                <p className="quote-text whitespace-pre-wrap">{q.text}</p>
+              )}
               <p className="mt-2 text-sm text-muted">
                 — <span className="italic">{q.work?.title}</span>
                 {q.work?.authors.length ? `, ${q.work.authors.join(", ")}` : ""}
@@ -93,9 +123,11 @@ export function ProfileView({ data, preview = false }: { data: PublicProfile; pr
                       <p className="whitespace-pre-wrap text-[0.95rem] leading-relaxed">{m.content}</p>
                     </div>
                   ))}
+                  <ReportButton targetKind="conversation" targetId={c.id} ownerId={profile.id} />
                 </div>
               </details>
             ))}
+            <ReportButton targetKind="quote" targetId={q.id} ownerId={profile.id} />
           </article>
         ))}
       </section>

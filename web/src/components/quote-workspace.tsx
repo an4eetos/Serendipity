@@ -75,6 +75,14 @@ export function QuoteWorkspace({ quoteId, onChange, onDeleted }: Props) {
 
   return (
     <div className="space-y-6">
+      {quote.removed_at && (
+        <div className="rounded-md border border-danger px-3 py-2 text-sm text-danger">
+          <p className="font-medium">Removed: {quote.removed_reason}</p>
+          <p className="mt-1 text-xs">
+            A moderator took this quote down. It&apos;s hidden from public pages and can&apos;t be published.
+          </p>
+        </div>
+      )}
       <blockquote className="border-l-2 border-accent pl-4">
         <p className="quote-text whitespace-pre-wrap">{quote.text}</p>
         <div className="mt-2">
@@ -137,6 +145,7 @@ function ReactionEditor({
   }
 
   const isPublic = quote.visibility === "public";
+  const removed = quote.removed_at != null;
   return (
     <section className="space-y-2">
       <label className="font-medium" htmlFor={`reaction-${quote.id}`}>
@@ -156,11 +165,17 @@ function ReactionEditor({
         </button>
         <button
           className={`btn ${isPublic ? "" : "btn-primary"}`}
-          disabled={busy}
+          disabled={busy || (removed && !isPublic)}
           onClick={() =>
             save({ reaction: dirty ? reaction : undefined, visibility: isPublic ? "private" : "public" })
           }
-          title={isPublic ? undefined : "Shows the quote, your reaction and its discussions on your profile"}
+          title={
+            isPublic
+              ? undefined
+              : removed
+                ? "A moderator removed this quote, so it can't be published"
+                : "Shows the quote, your reaction and its discussions on your profile"
+          }
         >
           {isPublic ? "Make private" : "Publish to profile"}
         </button>
@@ -172,6 +187,12 @@ function ReactionEditor({
           </button>
         )}
       </div>
+      {isPublic && quote.passage_hidden && (
+        <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
+          On public pages this passage is hidden because this book&apos;s public quota is full. Your reaction and the
+          citation still show.
+        </p>
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </section>
   );
@@ -212,7 +233,15 @@ function Discussions({
         if (e.type === "done") {
           setConversations((prev) => [
             ...prev,
-            { id: convId, quote_id: quote.id, persona, messages: [e.message], created_at: e.message.created_at },
+            {
+              id: convId,
+              quote_id: quote.id,
+              persona,
+              messages: [e.message],
+              created_at: e.message.created_at,
+              removed_at: null,
+              removed_reason: "",
+            },
           ]);
           setOpen(false);
         }
@@ -333,6 +362,11 @@ function Thread({ conversation, setConversations }: { conversation: Conversation
   return (
     <div className="card space-y-3 p-3">
       <p className="font-medium">{name}</p>
+      {conversation.removed_at && (
+        <p className="rounded-md border border-danger px-3 py-2 text-sm text-danger">
+          Removed: {conversation.removed_reason}
+        </p>
+      )}
       {conversation.messages.map((m) => (
         <MessageBubble key={m.id} message={m} personaName={name} />
       ))}

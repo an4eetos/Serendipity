@@ -55,11 +55,13 @@ func ToMessageResponse(m domain.Message) MessageResponse {
 }
 
 type ConversationResponse struct {
-	ID        string            `json:"id"`
-	QuoteID   string            `json:"quote_id"`
-	Persona   PersonaResponse   `json:"persona"`
-	Messages  []MessageResponse `json:"messages"`
-	CreatedAt time.Time         `json:"created_at"`
+	ID            string            `json:"id"`
+	QuoteID       string            `json:"quote_id"`
+	Persona       PersonaResponse   `json:"persona"`
+	Messages      []MessageResponse `json:"messages"`
+	RemovedAt     *time.Time        `json:"removed_at"`
+	RemovedReason string            `json:"removed_reason"`
+	CreatedAt     time.Time         `json:"created_at"`
 }
 
 func ToConversationResponses(cs []domain.Conversation) []ConversationResponse {
@@ -70,11 +72,13 @@ func ToConversationResponses(cs []domain.Conversation) []ConversationResponse {
 			msgs[j] = ToMessageResponse(m)
 		}
 		out[i] = ConversationResponse{
-			ID:        c.ID,
-			QuoteID:   c.QuoteID,
-			Persona:   ToPersonaResponse(c.Persona),
-			Messages:  msgs,
-			CreatedAt: c.CreatedAt,
+			ID:            c.ID,
+			QuoteID:       c.QuoteID,
+			Persona:       ToPersonaResponse(c.Persona),
+			Messages:      msgs,
+			RemovedAt:     c.RemovedAt,
+			RemovedReason: c.RemovedReason,
+			CreatedAt:     c.CreatedAt,
 		}
 	}
 	return out

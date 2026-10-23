@@ -2,27 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { get } from "@/lib/api";
 import { useSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import type { Profile } from "@/lib/types";
+import type { Me } from "@/lib/types";
+import { TermsPrompt } from "./terms-prompt";
 
 export function Header() {
   const session = useSession();
   const router = useRouter();
-  const [username, setUsername] = useState<string>();
+  const [me, setMe] = useState<Me>();
 
   useEffect(() => {
     if (!session) return;
-    get<Profile>("/me")
-      .then((p) => setUsername(p.username))
+    get<Me>("/me")
+      .then(setMe)
       .catch(() => {});
   }, [session]);
 
   async function signOut() {
     await supabase().auth.signOut();
-    setUsername(undefined);
+    setMe(undefined);
     router.push("/");
   }
 
@@ -38,8 +39,8 @@ export function Header() {
             <Link href="/library" className="hover:text-accent">
               Library
             </Link>
-            {username && (
-              <Link href={`/u/${username}`} className="hover:text-accent">
+            {me?.username && (
+              <Link href={`/u/${me.username}`} className="hover:text-accent">
                 Profile
               </Link>
             )}
@@ -53,6 +54,13 @@ export function Header() {
           </Link>
         ) : null}
       </nav>
+      {session && me && !me.terms_accepted && (
+        // TermsPrompt reads the pathname: its own boundary keeps the layout
+        // from suspending on dynamic routes under cacheComponents.
+        <Suspense fallback={null}>
+          <TermsPrompt me={me} onAccepted={setMe} />
+        </Suspense>
+      )}
     </header>
   );
 }
