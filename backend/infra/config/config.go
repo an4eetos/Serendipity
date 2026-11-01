@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	defaultAddr          = ":8787"
 	defaultTermsVersion  = "draft-2026-10"
 	defaultPublicWordCap = 2500
 	// maxTermsVersionLength is the limit of profiles.terms_version.
@@ -72,7 +73,7 @@ type Coverage struct {
 func Load() (Config, error) {
 	c := Config{
 		HTTP: HTTP{
-			Addr:           env("API_ADDR", ":8787"),
+			Addr:           listenAddr(os.Getenv("API_ADDR"), os.Getenv("PORT")),
 			AllowedOrigins: strings.Split(env("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"), ","),
 		},
 		Database: Database{URL: os.Getenv("DATABASE_URL")},
@@ -110,6 +111,18 @@ func Load() (Config, error) {
 		return c, errors.New("missing required env: " + strings.Join(missing, ", "))
 	}
 	return c, nil
+}
+
+// listenAddr is API_ADDR when set, otherwise the PORT a host such as Railway
+// assigns, otherwise the default.
+func listenAddr(addr, port string) string {
+	if addr != "" {
+		return addr
+	}
+	if port != "" {
+		return ":" + port
+	}
+	return defaultAddr
 }
 
 // termsVersion reads TERMS_VERSION: unset means the default. A set value is

@@ -1,0 +1,11 @@
+# Railway service "api": set Root Directory to /backend and Config File Path to
+# /backend/railway.toml (the config path doesn't follow the root directory).
+[build]
+builder = "DOCKERFILE"
+watchPatterns = ["/backend/**"]
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

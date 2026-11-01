@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+*.test
+*.out
+coverage.*
+Dockerfile
+.dockerignore
+railway.toml

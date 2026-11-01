@@ -14,6 +14,8 @@ func setEnv(t *testing.T, vars map[string]*string) {
 		"DATABASE_URL":              ptr("postgresql://user@127.0.0.1:5432/db"),
 		"SUPABASE_URL":              ptr("http://127.0.0.1:54321"),
 		"SUPABASE_SERVICE_ROLE_KEY": ptr("test-only"),
+		"API_ADDR":                  nil,
+		"PORT":                      nil,
 		"TERMS_VERSION":             nil,
 		"PUBLIC_WORD_CAP":           nil,
 	}
@@ -94,6 +96,28 @@ func TestLoadPublicWordCap(t *testing.T) {
 			}
 			if err != nil || c.Coverage.PublicWordCap != tt.want {
 				t.Errorf("Load() = %d, %v; want %d", c.Coverage.PublicWordCap, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadAddr(t *testing.T) {
+	tests := []struct {
+		name       string
+		addr, port *string
+		want       string
+	}{
+		{"neither means the default", nil, nil, ":8787"},
+		{"API_ADDR", ptr("127.0.0.1:9000"), nil, "127.0.0.1:9000"},
+		{"PORT from the host", nil, ptr("4321"), ":4321"},
+		{"API_ADDR wins over PORT", ptr(":9000"), ptr("4321"), ":9000"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnv(t, map[string]*string{"API_ADDR": tt.addr, "PORT": tt.port})
+			c, err := Load()
+			if err != nil || c.HTTP.Addr != tt.want {
+				t.Errorf("Load() = %q, %v; want %q", c.HTTP.Addr, err, tt.want)
 			}
 		})
 	}
