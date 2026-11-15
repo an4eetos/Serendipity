@@ -15,10 +15,13 @@ type GetMe struct {
 	terms    domain.Terms
 }
 
+// NewGetMe returns the GetMe usecase for the current terms.
 func NewGetMe(profiles ports.ProfileRepository, terms domain.Terms) *GetMe {
 	return &GetMe{profiles: profiles, terms: terms}
 }
 
+// Execute returns the reader's own profile and whether they accepted the
+// current terms.
 func (uc *GetMe) Execute(ctx context.Context, userID string) (domain.Me, error) {
 	p, err := uc.profiles.Get(ctx, userID)
 	if err != nil {

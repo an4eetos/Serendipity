@@ -28,6 +28,10 @@ func TestOwnershipConfirmedAt(t *testing.T) {
 		if err != nil || progressed.OwnershipConfirmedAt != nil {
 			t.Errorf("Update without a confirmation = %#v, %v; want it left unset", progressed, err)
 		}
+		bare, err := repo.Update(ctx, uid, item.ID, domain.Patch{OwnershipConfirmed: true})
+		if err != nil || bare.OwnershipConfirmedAt != nil {
+			t.Errorf("Update with a confirmation but no file = %#v, %v; want it left unset", bare, err)
+		}
 		uploaded, err := repo.Update(ctx, uid, item.ID, domain.Patch{
 			FilePath: ptr(uid + "/phaedo.epub"), FileType: ptr(domain.FileEPUB), OwnershipConfirmed: true,
 		})
@@ -41,6 +45,61 @@ func TestOwnershipConfirmedAt(t *testing.T) {
 		listed, err := repo.List(ctx, uid)
 		if err != nil || len(listed) != 1 || listed[0].OwnershipConfirmedAt == nil {
 			t.Errorf("List() = %#v, %v; want the confirmation read back", listed, err)
+		}
+	})
+}
+
+func TestConfirmOwnership(t *testing.T) {
+	pgtest.Run(t, func(ctx context.Context, db *kernelpg.DB) {
+		uid := pgtest.NewUser(t, ctx, db)
+		other := pgtest.NewUser(t, ctx, db)
+		works := catalogpg.NewWorkRepository(db)
+		repo := NewLibraryRepository(db)
+		add := func(user, title string) domain.Item {
+			t.Helper()
+			work, err := works.Ensure(ctx, catalog.Work{Title: title}, user)
+			if err != nil {
+				t.Fatal(err)
+			}
+			item, err := repo.Add(ctx, user, work.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return item
+		}
+		crito, apology, theirs := add(uid, "Crito"), add(uid, "Apology"), add(other, "Meno")
+		// now() is fixed inside the test's transaction, so backdate the rows
+		// for a changed updated_at to show.
+		if _, err := db.Exec(ctx, `update library_items set updated_at = '2020-01-01Z' where user_id = $1`, uid); err != nil {
+			t.Fatal(err)
+		}
+		for i, it := range []*domain.Item{&crito, &apology} {
+			got, err := repo.Get(ctx, uid, it.ID)
+			if err != nil {
+				t.Fatal(i, err)
+			}
+			*it = got
+		}
+
+		if err := repo.ConfirmOwnership(ctx, uid, nil); err != nil {
+			t.Errorf("ConfirmOwnership(no ids) = %v", err)
+		}
+		if err := repo.ConfirmOwnership(ctx, uid, []string{crito.ID, apology.ID, theirs.ID}); err != nil {
+			t.Fatal(err)
+		}
+		for _, before := range []domain.Item{crito, apology} {
+			got, err := repo.Get(ctx, uid, before.ID)
+			if err != nil || got.OwnershipConfirmedAt == nil {
+				t.Errorf("Get(%s) = %#v, %v; want the confirmation recorded", before.Work.Title, got, err)
+				continue
+			}
+			// The shelf is ordered by updated_at: confirming must not reorder it.
+			if !got.UpdatedAt.Equal(before.UpdatedAt) {
+				t.Errorf("%s updated_at = %v, want it unchanged (%v)", before.Work.Title, got.UpdatedAt, before.UpdatedAt)
+			}
+		}
+		if got, err := repo.Get(ctx, other, theirs.ID); err != nil || got.OwnershipConfirmedAt != nil {
+			t.Errorf("another reader's item = %#v, %v; want it untouched", got, err)
 		}
 	})
 }

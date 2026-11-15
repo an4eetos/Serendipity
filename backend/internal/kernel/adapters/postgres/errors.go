@@ -34,6 +34,14 @@ func IsUniqueViolation(err error) bool { return hasCode(err, codeUniqueViolation
 // IsCheckViolation reports whether err is a check constraint violation.
 func IsCheckViolation(err error) bool { return hasCode(err, codeCheckViolation) }
 
+// IsCheckViolationOf reports whether err is a violation of the named check
+// constraint, or a trigger's check violation raised under that name. The name
+// is not localised, unlike the message and its context.
+func IsCheckViolationOf(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == codeCheckViolation && pgErr.ConstraintName == constraint
+}
+
 func hasCode(err error, code string) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == code

@@ -104,6 +104,14 @@ type Patch struct {
 	OwnershipConfirmed bool
 }
 
+// ConfirmsOwnership reports whether applying the patch records a new
+// ownership confirmation. Only a patch that sets a file does: the
+// confirmation is about the copy being uploaded, so on its own it changes
+// nothing.
+func (p Patch) ConfirmsOwnership() bool {
+	return p.OwnershipConfirmed && p.FilePath != nil
+}
+
 // Validate checks a patch made by the item's owner.
 func (p Patch) Validate(ownerID string) error {
 	if p.Progress != nil && (*p.Progress < 0 || *p.Progress > 1) {

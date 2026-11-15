@@ -29,8 +29,8 @@ func (f *fakeWorks) Ensure(_ context.Context, w catalog.Work, _ string) (catalog
 type fakeLibrary struct {
 	libraryports.LibraryRepository
 	byTitle map[string]library.Item
-	// updated maps the items Update was called on to their patches.
-	updated   map[string]library.Patch
+	// confirmed holds the item ids of each ConfirmOwnership call.
+	confirmed [][]string
 	outsideTx bool
 }
 
@@ -47,13 +47,10 @@ func (f *fakeLibrary) Add(_ context.Context, _, workID string) (library.Item, er
 	return it, nil
 }
 
-func (f *fakeLibrary) Update(ctx context.Context, _, id string, p library.Patch) (library.Item, error) {
+func (f *fakeLibrary) ConfirmOwnership(ctx context.Context, _ string, ids []string) error {
 	f.outsideTx = f.outsideTx || !portstest.InTx(ctx)
-	if f.updated == nil {
-		f.updated = map[string]library.Patch{}
-	}
-	f.updated[id] = p
-	return library.Item{ID: id}, nil
+	f.confirmed = append(f.confirmed, ids)
+	return nil
 }
 
 // fakeQuotes treats texts it has seen as duplicates.
@@ -112,13 +109,10 @@ func TestImportClippings(t *testing.T) {
 			txm.Calls, quotes.outsideTx, lib.outsideTx)
 	}
 	// Each book of the file records the confirmation, new or already in the
-	// library, and the patch changes nothing else.
-	wantUpdates := map[string]library.Patch{
-		"item-work-The Republic": {OwnershipConfirmed: true},
-		"item-med":               {OwnershipConfirmed: true},
-	}
-	if !reflect.DeepEqual(lib.updated, wantUpdates) {
-		t.Errorf("library updates = %#v, want %#v", lib.updated, wantUpdates)
+	// library, in one call.
+	wantConfirmed := [][]string{{"item-work-The Republic", "item-med"}}
+	if !reflect.DeepEqual(lib.confirmed, wantConfirmed) {
+		t.Errorf("ownership confirmed for %#v, want %#v", lib.confirmed, wantConfirmed)
 	}
 }
 
@@ -142,9 +136,9 @@ func TestImportClippingsNeedsOwnershipConfirmation(t *testing.T) {
 	if !errors.Is(err, library.ErrOwnershipUnconfirmed) {
 		t.Fatalf("err = %v, want library.ErrOwnershipUnconfirmed", err)
 	}
-	if file.reads != 0 || txm.Calls != 0 || len(lib.updated) != 0 || len(quotes.drafts) != 0 {
+	if file.reads != 0 || txm.Calls != 0 || len(lib.confirmed) != 0 || len(quotes.drafts) != 0 {
 		t.Errorf("reads %d, transactions %d, library updates %d, quotes %d; want the file left unread and nothing written",
-			file.reads, txm.Calls, len(lib.updated), len(quotes.drafts))
+			file.reads, txm.Calls, len(lib.confirmed), len(quotes.drafts))
 	}
 }
 

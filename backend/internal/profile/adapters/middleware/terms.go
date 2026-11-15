@@ -14,6 +14,7 @@ type Terms struct {
 	check *usecase.CheckTerms
 }
 
+// NewTerms returns the terms gate.
 func NewTerms(check *usecase.CheckTerms) *Terms {
 	return &Terms{check: check}
 }

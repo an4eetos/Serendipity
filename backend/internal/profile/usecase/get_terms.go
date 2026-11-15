@@ -11,10 +11,12 @@ type GetTerms struct {
 	terms domain.Terms
 }
 
+// NewGetTerms returns the GetTerms usecase for the current terms.
 func NewGetTerms(terms domain.Terms) *GetTerms {
 	return &GetTerms{terms: terms}
 }
 
+// Execute returns the current terms.
 func (uc *GetTerms) Execute(_ context.Context) domain.Terms {
 	return uc.terms
 }

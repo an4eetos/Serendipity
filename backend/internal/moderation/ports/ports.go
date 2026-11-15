@@ -36,6 +36,13 @@ type TakedownRepository interface {
 	MarkRestored(ctx context.Context, id, adminID string) (domain.Takedown, error)
 }
 
+// ProfileVisibility knows whose profiles are public.
+type ProfileVisibility interface {
+	// IsPublic reports whether userID's profile is public. A missing
+	// profile is not.
+	IsPublic(ctx context.Context, userID string) (bool, error)
+}
+
 // AdminRepository knows who the admins are.
 type AdminRepository interface {
 	IsAdmin(ctx context.Context, userID string) (bool, error)

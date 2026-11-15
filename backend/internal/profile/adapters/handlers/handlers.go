@@ -11,6 +11,7 @@ import (
 	"github.com/an4eetos/serendipity/backend/internal/profile/usecase"
 )
 
+// Handler serves profiles and the terms of service over HTTP.
 type Handler struct {
 	me       *usecase.GetMe
 	updateMe *usecase.UpdateMe
@@ -24,6 +25,7 @@ var (
 	_ httpapi.TermsRoutes = (*Handler)(nil)
 )
 
+// New returns a Handler on the profile usecases.
 func New(me *usecase.GetMe, updateMe *usecase.UpdateMe, public *usecase.GetPublicProfile,
 	terms *usecase.GetTerms, accept *usecase.AcceptTerms) *Handler {
 	return &Handler{me: me, updateMe: updateMe, public: public, terms: terms, accept: accept}

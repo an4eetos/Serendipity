@@ -14,6 +14,7 @@ type CheckTerms struct {
 	terms    domain.Terms
 }
 
+// NewCheckTerms returns the CheckTerms usecase for the current terms.
 func NewCheckTerms(profiles ports.ProfileRepository, terms domain.Terms) *CheckTerms {
 	return &CheckTerms{profiles: profiles, terms: terms}
 }

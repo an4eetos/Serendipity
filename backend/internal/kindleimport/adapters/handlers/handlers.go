@@ -13,6 +13,7 @@ import (
 
 const maxClippingsUpload = 20 << 20
 
+// Handler serves the Kindle import over HTTP.
 type Handler struct {
 	importer *usecase.ImportClippings
 }
@@ -21,6 +22,7 @@ func New(importer *usecase.ImportClippings) *Handler {
 	return &Handler{importer: importer}
 }
 
+// RegisterRoutes mounts the import on the signed-in router.
 func (h *Handler) RegisterRoutes(_, private chi.Router) {
 	private.Post("/imports/kindle", h.importKindle)
 }

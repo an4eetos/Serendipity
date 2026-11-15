@@ -46,6 +46,8 @@ func Conflict(msg string) *Error { return &Error{kind: KindConflict, msg: msg} }
 
 func Unavailable(msg string) *Error { return &Error{kind: KindUnavailable, msg: msg} }
 
+// Forbidden returns an error for an action the caller may not take, such as a
+// write before accepting the terms or an admin route for a reader.
 func Forbidden(msg string) *Error { return &Error{kind: KindForbidden, msg: msg} }
 
 // ErrNotFound is returned for anything that does not exist or is not the

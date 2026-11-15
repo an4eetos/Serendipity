@@ -36,10 +36,12 @@ Backend and database (done):
 
 Verified locally: `go test ./...` passes. The image starts on `$PORT` against local Supabase and serves `/healthz` and `/terms`. It applies CORS for `ALLOWED_ORIGINS` and exits 0 on SIGTERM. It exits 1 when the database is unreachable, which fails the Railway health check and keeps the previous deploy serving. The seed runs twice without error and leaves 6 presets.
 
-Web (still to do):
+Web (done):
 
-- `web/package.json`: add `"engines": { "node": ">=22" }` so the builder uses Node 22.
-- `web/railway.toml` (optional): `watchPatterns = ["/web/**"]`, `healthcheckPath = "/"`.
+- `web/package.json`: `"engines": { "node": ">=22" }` so the builder uses Node 22, Next.js 16.4.6 (16.4.0 had critical advisories) and an `overrides` pin of `@xmldom/xmldom` to the patched 0.8.15 under `epubjs`.
+- [`web/railway.toml`](../web/railway.toml): `/web/**` watch paths and a `/` health check. Set **Config File Path** to `/web/railway.toml`.
+
+CI (done): [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs gofmt, `go vet` and `go test -race` against a `supabase db start` database, then the web lint, typecheck, build and a production `npm audit`.
 
 ## 2. Supabase project
 
@@ -49,7 +51,7 @@ Web (still to do):
    ```sh
    npx supabase login
    npx supabase link --project-ref <ref>
-   npx supabase db push --dry-run          # should list the 2 migrations
+   npx supabase db push --dry-run          # should list the 3 migrations
    npx supabase db push --include-seed     # migrations + preset characters
    ```
 
@@ -128,8 +130,8 @@ Create one project from the GitHub repo with two services. Generate both public 
 ## 6. Running it
 
 - **Schema changes**: add a migration under `supabase/migrations/`, run `npx supabase db push --dry-run` and then `db push` against production **before** merging code that needs the change. Migrations are forward-only, so take a backup first (Pro: Database → Backups).
-- **Deploys**: pushing to `main` rebuilds only the service whose watch paths changed. Turn on Railway's "Wait for CI" with a GitHub Action that runs `go test ./...` and the web lint/typecheck, so a red build never ships.
-- **Rollback**: redeploy the previous build from Railway's deployments list. A database rollback means writing a new migration.
+- **Deploys**: pushing to `main` rebuilds only the service whose watch paths changed. Turn on Railway's "Wait for CI" for both services so a red [CI](../.github/workflows/ci.yml) run never ships.
+- **Rollback**: redeploy the previous build from Railway's deployments list. A database rollback means writing a new migration. The one exception is undoing Phase 1 entirely: [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0 (read its header first; it drops moderation data and refuses to run while removed discussions exist).
 - **Config bumps**: changing `TERMS_VERSION` on `api` and redeploying makes every reader accept the terms again.
 - **Watch**: Railway logs (chi's request log, `slog` errors), the Supabase database CPU and connection count, and Anthropic spend.
 - **Secrets**: rotate the service key or Anthropic key by updating the Railway variable, which redeploys the service. Never commit `backend/.env` or `web/.env.local`.

@@ -16,6 +16,7 @@ type AcceptTerms struct {
 	terms    domain.Terms
 }
 
+// NewAcceptTerms returns the AcceptTerms usecase for the current terms.
 func NewAcceptTerms(txm kernelports.TxManager, profiles ports.ProfileRepository, terms domain.Terms) *AcceptTerms {
 	return &AcceptTerms{txm: txm, profiles: profiles, terms: terms}
 }

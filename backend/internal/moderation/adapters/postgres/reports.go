@@ -40,7 +40,7 @@ func (r *ReportRepository) Create(ctx context.Context, rep domain.Report) (domai
 	switch {
 	case kernelpg.IsUniqueViolation(err):
 		return domain.Report{}, domain.ErrAlreadyReported
-	case kernelpg.IsCheckViolation(err):
+	case kernelpg.IsCheckViolationOf(err, "reports_not_own_content"):
 		return domain.Report{}, domain.ErrOwnContent
 	case err != nil:
 		return domain.Report{}, err

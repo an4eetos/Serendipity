@@ -19,6 +19,10 @@ type LibraryRepository interface {
 	// FindByTitle matches a reader's item by case-insensitive work title.
 	FindByTitle(ctx context.Context, userID, title string) (domain.Item, error)
 	Update(ctx context.Context, userID, id string, p domain.Patch) (domain.Item, error)
+	// ConfirmOwnership records, in one statement, that the reader confirmed
+	// they own the copies of the items ids names. Ids that aren't the
+	// reader's are ignored.
+	ConfirmOwnership(ctx context.Context, userID string, ids []string) error
 }
 
 // FileStorage holds readers' private copies of their books.

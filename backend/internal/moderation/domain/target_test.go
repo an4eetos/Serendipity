@@ -81,3 +81,29 @@ func TestCheckReportable(t *testing.T) {
 		}
 	}
 }
+
+func TestTargetOnProfile(t *testing.T) {
+	tests := []struct {
+		name            string
+		public, profile bool
+		want            bool
+	}{
+		{"public content on a public profile", true, true, true},
+		{"public content on a private profile", true, false, false},
+		{"hidden content on a public profile", false, true, false},
+		{"hidden content on a private profile", false, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Target{OwnerID: "ada", Public: tt.public}.OnProfile(tt.profile)
+			if got.Public != tt.want || got.OwnerID != "ada" {
+				t.Errorf("OnProfile(%v) = %#v, want Public %v and the rest unchanged", tt.profile, got, tt.want)
+			}
+			if tt.public && !tt.profile {
+				if err := got.CheckReportable("bo"); !errors.Is(err, kernel.ErrNotFound) {
+					t.Errorf("CheckReportable() = %v, want ErrNotFound: readers can't see it", err)
+				}
+			}
+		})
+	}
+}

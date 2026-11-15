@@ -47,6 +47,14 @@ func ConversationTarget(c discussion.Conversation, q quote.Quote) Target {
 	}
 }
 
+// OnProfile returns t as seen by readers, given whether its owner's profile
+// is public: content on a private profile is on no public page, however its
+// own visibility is set.
+func (t Target) OnProfile(profilePublic bool) Target {
+	t.Public = t.Public && profilePublic
+	return t
+}
+
 // CheckReportable reports whether reporterID may report t: readers report
 // only what they can see, and never their own content.
 func (t Target) CheckReportable(reporterID string) error {

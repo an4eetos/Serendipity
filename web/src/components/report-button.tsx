@@ -2,8 +2,8 @@
 
 import { useId, useState } from "react";
 import { post } from "@/lib/api";
-import { useSession } from "@/lib/auth";
 import { reportReasonLabels, type Report, type ReportReason, type ReportTargetKind } from "@/lib/types";
+import { useViewerId } from "./viewer";
 
 const MAX_NOTE = 1000;
 const reasons = Object.keys(reportReasonLabels) as ReportReason[];
@@ -17,8 +17,9 @@ type Props = {
 
 // ReportButton lets a signed-in reader flag a public quote or discussion for
 // moderators. It renders nothing for signed-out viewers and for the owner.
+// It must be rendered inside a ViewerProvider, which holds the session.
 export function ReportButton({ targetKind, targetId, ownerId }: Props) {
-  const session = useSession();
+  const viewerId = useViewerId();
   const id = useId();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason | "">("");
@@ -27,7 +28,7 @@ export function ReportButton({ targetKind, targetId, ownerId }: Props) {
   const [error, setError] = useState<string>();
   const [sent, setSent] = useState(false);
 
-  if (!session || session.user.id === ownerId) return null;
+  if (!viewerId || viewerId === ownerId) return null;
 
   if (sent) return <p className="text-xs text-muted">Thanks for the report. A moderator will take a look.</p>;
 

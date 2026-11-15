@@ -86,7 +86,7 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, id string, p dom
 			ownership_confirmed_at = case when $8 then now() else ownership_confirmed_at end,
 			updated_at    = now()
 		where user_id = $1 and id = $2`,
-		userID, id, p.Progress, p.Status, p.LastLocation, p.FilePath, p.FileType, p.OwnershipConfirmed)
+		userID, id, p.Progress, p.Status, p.LastLocation, p.FilePath, p.FileType, p.ConfirmsOwnership())
 	if err != nil {
 		return domain.Item{}, err
 	}
@@ -94,4 +94,17 @@ func (r *LibraryRepository) Update(ctx context.Context, userID, id string, p dom
 		return domain.Item{}, kernel.ErrNotFound
 	}
 	return r.Get(ctx, userID, id)
+}
+
+// ConfirmOwnership implements ports.LibraryRepository. It leaves updated_at
+// alone, so confirming doesn't move the books up the reader's shelf.
+func (r *LibraryRepository) ConfirmOwnership(ctx context.Context, userID string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.db.Exec(ctx, `
+		update library_items set ownership_confirmed_at = now()
+		where user_id = $1 and id = any($2::uuid[])`,
+		userID, ids)
+	return err
 }

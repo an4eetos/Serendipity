@@ -16,6 +16,7 @@ type CoverageRepository struct {
 
 var _ ports.CoverageRepository = (*CoverageRepository)(nil)
 
+// NewCoverageRepository returns a CoverageRepository on db.
 func NewCoverageRepository(db *kernelpg.DB) *CoverageRepository {
 	return &CoverageRepository{db: db}
 }
@@ -30,6 +31,7 @@ func setCoverageCap(ctx context.Context, db *kernelpg.DB, wordCap domain.Coverag
 		strconv.Itoa(int(wordCap))).Scan(&setting)
 }
 
+// SetCap implements ports.CoverageRepository.
 func (r *CoverageRepository) SetCap(ctx context.Context, wordCap domain.CoverageCap) error {
 	return setCoverageCap(ctx, r.db, wordCap)
 }
@@ -41,6 +43,7 @@ func (r *CoverageRepository) LockWork(ctx context.Context, workID string) error 
 	return r.db.QueryRow(ctx, `select 1 from works where id = $1 for no key update`, workID).Scan(&locked)
 }
 
+// Coverage implements ports.CoverageRepository.
 func (r *CoverageRepository) Coverage(ctx context.Context, workID, quoteID string) (domain.Coverage, error) {
 	var c domain.Coverage
 	err := r.db.QueryRow(ctx, `

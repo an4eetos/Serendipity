@@ -51,6 +51,7 @@ type MeResponse struct {
 	TermsAccepted       bool       `json:"terms_accepted"`
 }
 
+// ToMeResponse converts the reader's own profile and terms status.
 func ToMeResponse(m domain.Me) MeResponse {
 	return MeResponse{
 		ProfileResponse:     ToProfileResponse(m.Profile),
@@ -61,10 +62,12 @@ func ToMeResponse(m domain.Me) MeResponse {
 	}
 }
 
+// TermsResponse is the current terms of service version.
 type TermsResponse struct {
 	Version string `json:"version"`
 }
 
+// ToTermsResponse converts the current terms.
 func ToTermsResponse(t domain.Terms) TermsResponse {
 	return TermsResponse{Version: t.Version}
 }
@@ -79,6 +82,7 @@ type CategoryResponse struct {
 	Books int    `json:"books"`
 }
 
+// TrailPointResponse places one public quote in its book, from 0 to 1.
 type TrailPointResponse struct {
 	QuoteID  string  `json:"quote_id"`
 	Position float64 `json:"position"`
@@ -90,6 +94,7 @@ type TrailResponse struct {
 	Unplaced int                  `json:"unplaced"`
 }
 
+// ToTrailResponse converts a book's reading trail.
 func ToTrailResponse(b domain.PublicBook) TrailResponse {
 	points := make([]TrailPointResponse, len(b.Trail))
 	for i, p := range b.Trail {

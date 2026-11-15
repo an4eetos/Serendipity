@@ -17,6 +17,7 @@ type UpdateQuote struct {
 	wordCap  domain.CoverageCap
 }
 
+// NewUpdateQuote returns the UpdateQuote usecase with the default coverage cap.
 func NewUpdateQuote(txm kernelports.TxManager, quotes ports.QuoteRepository,
 	coverage ports.CoverageRepository, wordCap domain.CoverageCap) *UpdateQuote {
 	return &UpdateQuote{txm: txm, quotes: quotes, coverage: coverage, wordCap: wordCap}

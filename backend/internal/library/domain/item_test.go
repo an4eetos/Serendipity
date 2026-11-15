@@ -42,6 +42,27 @@ func TestPatchValidate(t *testing.T) {
 	}
 }
 
+func TestPatchConfirmsOwnership(t *testing.T) {
+	file := ptr("user-1/a.epub")
+	tests := []struct {
+		name  string
+		patch Patch
+		want  bool
+	}{
+		{"a file with the confirmation", Patch{FilePath: file, FileType: ptr(FileEPUB), OwnershipConfirmed: true}, true},
+		{"a confirmation without a file", Patch{OwnershipConfirmed: true}, false},
+		{"a confirmation with only progress", Patch{Progress: ptr(0.5), OwnershipConfirmed: true}, false},
+		{"neither", Patch{Progress: ptr(0.5)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.patch.ConfirmsOwnership(); got != tt.want {
+				t.Errorf("ConfirmsOwnership() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCheckOwnershipConfirmed(t *testing.T) {
 	if err := CheckOwnershipConfirmed(false); !errors.Is(err, ErrOwnershipUnconfirmed) {
 		t.Errorf("unconfirmed: err = %v, want ErrOwnershipUnconfirmed", err)

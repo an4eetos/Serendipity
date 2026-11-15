@@ -1,0 +1,12 @@
+# Railway service "web": set Root Directory to /web and Config File Path to
+# /web/railway.toml (the config path doesn't follow the root directory).
+# The default Railpack builder runs `npm ci && npm run build`, then
+# `npm run start`; `next start` listens on $PORT. Node comes from "engines".
+[build]
+watchPatterns = ["/web/**"]
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

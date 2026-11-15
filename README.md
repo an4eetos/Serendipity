@@ -71,8 +71,10 @@ http://127.0.0.1:54324.
 
 Besides the Supabase and Anthropic settings, the API reads:
 
-- `TERMS_VERSION` (default `draft-2026-10`): the terms of service version
-  readers must accept before any write. Bump it to have everyone accept again.
+- `TERMS_VERSION` (default `draft-2026-10` when unset): the terms of service
+  version readers must accept before any write. Bump it to have everyone
+  accept again. If set, it must be 1 to 64 characters: the API refuses to
+  start with an empty or longer value rather than fall back to the draft.
 - `PUBLIC_WORD_CAP` (default `2500`, a whole number of at least 1): how many
   distinct words of one work may be public across all readers. Past it, a
   newly published passage is collapsed. Override it for one work with
@@ -100,6 +102,18 @@ is rolled back, so it leaves no data behind:
 ```sh
 cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres go test ./...
 ```
+
+The API end-to-end scenario (terms, ownership, storage, coverage cap, public
+profile, reports, admin takedown and restore) builds and starts the real API
+against the local stack, signs in three throwaway users and deletes everything
+it created. It refuses to run against anything but localhost:
+
+```sh
+cd backend && E2E=1 go test -tags e2e -count=1 -v ./e2e/...
+```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the Go tests
+against a `supabase db start` database and the web lint, typecheck and build.
 
 ## API
 

@@ -54,6 +54,7 @@ func (r *ProfileRepository) Update(ctx context.Context, id string, p domain.Patc
 	return prof, err
 }
 
+// AcceptTerms implements ports.ProfileRepository.
 func (r *ProfileRepository) AcceptTerms(ctx context.Context, id, version string) (domain.Profile, error) {
 	return scanProfile(r.db.QueryRow(ctx, `
 		update profiles set terms_version = $2, terms_accepted_at = now()

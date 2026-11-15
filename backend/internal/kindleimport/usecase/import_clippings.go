@@ -37,6 +37,8 @@ func NewImportClippings(
 	return &ImportClippings{txm: txm, works: works, library: library, quotes: quotes}
 }
 
+// Execute imports clippings for userID, who must have confirmed they own the
+// copies. Nothing is written unless the whole file imports.
 func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings io.Reader,
 	ownershipConfirmed bool) (domain.Report, error) {
 	if err := library.CheckOwnershipConfirmed(ownershipConfirmed); err != nil {
@@ -49,15 +51,13 @@ func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings
 	var report domain.Report
 	err = uc.txm.WithinTx(ctx, func(ctx context.Context) error {
 		report = domain.Report{}
+		itemIDs := make([]string, 0, len(books))
 		for _, b := range books {
 			item, err := uc.libraryItem(ctx, userID, b)
 			if err != nil {
 				return err
 			}
-			if _, err := uc.library.Update(ctx, userID, item.ID,
-				library.Patch{OwnershipConfirmed: true}); err != nil {
-				return err
-			}
+			itemIDs = append(itemIDs, item.ID)
 			report.Books++
 			report.OrphanNotes += b.OrphanNotes
 			for _, h := range b.Highlights {
@@ -76,7 +76,9 @@ func (uc *ImportClippings) Execute(ctx context.Context, userID string, clippings
 				}
 			}
 		}
-		return nil
+		// Each book of the file records the confirmation, in one write that
+		// doesn't reorder the reader's shelf.
+		return uc.library.ConfirmOwnership(ctx, userID, itemIDs)
 	})
 	return report, err
 }

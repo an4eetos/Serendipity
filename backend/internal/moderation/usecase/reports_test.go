@@ -51,11 +51,13 @@ func TestCreateReport(t *testing.T) {
 		wantCalls []string
 	}{
 		{"someone else's public quote", "bo", quoteRef("q-public"), domain.ReasonCopyright, nil, nil,
-			[]string{"quotes.ListAny [q-public]", "reports.Create (tx)"}},
+			[]string{"quotes.ListAny [q-public]", "profiles.IsPublic ada", "reports.Create (tx)"}},
+		{"public quote on a private profile", "bo", quoteRef("q-on-private-profile"), domain.ReasonSpam, nil, kernel.ErrNotFound,
+			[]string{"quotes.ListAny [q-on-private-profile]", "profiles.IsPublic cy"}},
 		{"someone else's answered discussion", "bo", convRef("c-answered"), domain.ReasonHarassment, nil, nil,
-			[]string{"conversations.ListAny [c-answered]", "quotes.ListAny [q-public]", "reports.Create (tx)"}},
+			[]string{"conversations.ListAny [c-answered]", "quotes.ListAny [q-public]", "profiles.IsPublic ada", "reports.Create (tx)"}},
 		{"own quote", "ada", quoteRef("q-public"), domain.ReasonSpam, nil, domain.ErrOwnContent,
-			[]string{"quotes.ListAny [q-public]"}},
+			[]string{"quotes.ListAny [q-public]", "profiles.IsPublic ada"}},
 		{"private quote", "bo", quoteRef("q-private"), domain.ReasonSpam, nil, kernel.ErrNotFound,
 			[]string{"quotes.ListAny [q-private]"}},
 		{"removed quote", "bo", quoteRef("q-removed"), domain.ReasonSpam, nil, kernel.ErrNotFound,
@@ -74,13 +76,13 @@ func TestCreateReport(t *testing.T) {
 			domain.ErrInvalidTarget, nil},
 		{"unknown reason is refused before any lookup", "bo", quoteRef("q-public"), "boring", nil, domain.ErrInvalidReason, nil},
 		{"already reported", "bo", quoteRef("q-public"), domain.ReasonSpam, domain.ErrAlreadyReported, domain.ErrAlreadyReported,
-			[]string{"quotes.ListAny [q-public]", "reports.Create (tx)"}},
+			[]string{"quotes.ListAny [q-public]", "profiles.IsPublic ada", "reports.Create (tx)"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := newWorld()
 			reports := &fakeReports{log: w.log, createErr: tt.createErr}
-			r, err := NewCreateReport(&portstest.TxManager{}, reports, w.quotes, w.conversations).
+			r, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations).
 				Execute(t.Context(), tt.reporter, tt.ref, tt.reason, " a note ")
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
@@ -104,7 +106,7 @@ func TestCreateReportStoresTheTargetsOwnID(t *testing.T) {
 	// The database matches a uuid however it is spelled.
 	w.quotes.byID["Q-PUBLIC"] = w.quotes.byID["q-public"]
 	reports := &fakeReports{log: w.log}
-	_, err := NewCreateReport(&portstest.TxManager{}, reports, w.quotes, w.conversations).
+	_, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations).
 		Execute(t.Context(), "bo", domain.TargetRef{Kind: domain.TargetQuote, ID: "Q-PUBLIC"}, domain.ReasonSpam, "")
 	if err != nil || reports.created[0].Target.ID != "q-public" {
 		t.Errorf("stored %#v, %v; want the quote's own id, so reports on it group together", reports.created, err)

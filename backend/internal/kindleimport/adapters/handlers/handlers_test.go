@@ -41,11 +41,9 @@ func (*fakeLibrary) Add(_ context.Context, _, workID string) (library.Item, erro
 	return library.Item{ID: "item-1", Work: catalog.Work{ID: workID}}, nil
 }
 
-func (f *fakeLibrary) Update(_ context.Context, _, id string, p library.Patch) (library.Item, error) {
-	if p.OwnershipConfirmed {
-		f.confirmed = append(f.confirmed, id)
-	}
-	return library.Item{ID: id}, nil
+func (f *fakeLibrary) ConfirmOwnership(_ context.Context, _ string, ids []string) error {
+	f.confirmed = append(f.confirmed, ids...)
+	return nil
 }
 
 type fakeQuotes struct{ quoteports.QuoteRepository }

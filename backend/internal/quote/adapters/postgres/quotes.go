@@ -3,10 +3,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
-	"strings"
-
-	"github.com/jackc/pgx/v5/pgconn"
 
 	catalogpg "github.com/an4eetos/serendipity/backend/internal/catalog/adapters/postgres"
 	kernelpg "github.com/an4eetos/serendipity/backend/internal/kernel/adapters/postgres"
@@ -46,17 +42,14 @@ func NewQuoteRepository(db *kernelpg.DB) *QuoteRepository {
 	return &QuoteRepository{db: db}
 }
 
-// coverageTrigger is the function behind trigger quotes_enforce_public_coverage.
-// Its only error is the check violation it raises when a removed quote is made
-// public (migration 20261024000000_phase1_open_to_strangers.sql).
-const coverageTrigger = "public.enforce_public_coverage"
+// removedQuoteGuard names the check violation that trigger
+// quotes_enforce_public_coverage raises when a removed quote is made public
+// (migration 20261115000000_name_removed_quote_guard.sql).
+const removedQuoteGuard = "quotes_removed_not_public"
 
-// isRemovedQuoteGuard reports whether err is that check violation, and not a
-// violation of one of the table's check constraints, which carry a name.
+// isRemovedQuoteGuard reports whether err is that check violation.
 func isRemovedQuoteGuard(err error) bool {
-	var pgErr *pgconn.PgError
-	return kernelpg.IsCheckViolation(err) && errors.As(err, &pgErr) && pgErr.ConstraintName == "" &&
-		strings.Contains(pgErr.Where, "PL/pgSQL function "+coverageTrigger+"(")
+	return kernelpg.IsCheckViolationOf(err, removedQuoteGuard)
 }
 
 func (r *QuoteRepository) Create(ctx context.Context, userID string, d domain.Draft) (domain.Quote, error) {
@@ -158,6 +151,9 @@ func (r *QuoteRepository) ListAny(ctx context.Context, ids []string) ([]domain.Q
 	return r.list(ctx, `select `+quoteColumns+quoteFrom+`where q.id = any($1::uuid[])`, ids)
 }
 
+// Remove implements ports.QuoteModeration: it hides the quote from public
+// reads with reason, or returns kernel.ErrNotFound when it is missing or
+// already removed.
 func (r *QuoteRepository) Remove(ctx context.Context, id, reason string) error {
 	tag, err := r.db.Exec(ctx, `
 		update quotes set removed_at = now(), removed_reason = $2, updated_at = now()

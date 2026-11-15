@@ -204,8 +204,20 @@ func (f *fakeAdmins) IsAdmin(_ context.Context, userID string) (bool, error) {
 //   - "c-removed": a removed discussion of "q-public".
 type world struct {
 	log           *recorder
+	profiles      *fakeProfiles
 	quotes        *fakeQuotes
 	conversations *fakeConversations
+}
+
+// fakeProfiles implements ports.ProfileVisibility on a set of public profiles.
+type fakeProfiles struct {
+	log    *recorder
+	public map[string]bool
+}
+
+func (f *fakeProfiles) IsPublic(ctx context.Context, userID string) (bool, error) {
+	f.log.add(ctx, "profiles.IsPublic %s", userID)
+	return f.public[userID], nil
 }
 
 func newWorld() world {
@@ -214,10 +226,13 @@ func newWorld() world {
 	public := quote.Quote{ID: "q-public", UserID: "ada", Visibility: quote.VisibilityPublic, Text: "To be"}
 	private := quote.Quote{ID: "q-private", UserID: "ada", Visibility: quote.VisibilityPrivate}
 	removed := quote.Quote{ID: "q-removed", UserID: "ada", Visibility: quote.VisibilityPublic, RemovedAt: &at, RemovedReason: "copyright"}
+	// cy's profile is private, so cy's public quote is on no public page.
+	onPrivateProfile := quote.Quote{ID: "q-on-private-profile", UserID: "cy", Visibility: quote.VisibilityPublic, Text: "Or not"}
 	return world{
-		log: log,
+		log:      log,
+		profiles: &fakeProfiles{log: log, public: map[string]bool{"ada": true, "bo": true}},
 		quotes: &fakeQuotes{log: log, byID: map[string]quote.Quote{
-			public.ID: public, private.ID: private, removed.ID: removed,
+			public.ID: public, private.ID: private, removed.ID: removed, onPrivateProfile.ID: onPrivateProfile,
 		}},
 		conversations: &fakeConversations{log: log, byID: map[string]discussion.Conversation{
 			"c-answered":   {ID: "c-answered", UserID: "ada", QuoteID: "q-public", Messages: answered},

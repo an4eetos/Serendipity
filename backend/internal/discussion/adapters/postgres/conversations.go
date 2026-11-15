@@ -77,6 +77,9 @@ func (r *ConversationRepository) ListAny(ctx context.Context, ids []string) ([]d
 	return r.list(ctx, `c.id = any($1::uuid[])`, ids)
 }
 
+// Remove implements ports.ConversationModeration: it hides the conversation
+// from public reads with reason, or returns kernel.ErrNotFound when it is
+// missing or already removed.
 func (r *ConversationRepository) Remove(ctx context.Context, id, reason string) error {
 	tag, err := r.db.Exec(ctx, `
 		update conversations set removed_at = now(), removed_reason = $2
@@ -90,6 +93,9 @@ func (r *ConversationRepository) Remove(ctx context.Context, id, reason string) 
 	return nil
 }
 
+// Restore implements ports.ConversationModeration: it puts a removed
+// conversation back in public reads, or returns kernel.ErrNotFound when it is
+// missing or not removed.
 func (r *ConversationRepository) Restore(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, `
 		update conversations set removed_at = null, removed_reason = ''
