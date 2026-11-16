@@ -12,8 +12,9 @@ built in parallel unless an order is given.
 | 0 ✓ | Core loop | Upload / Kindle import, quote, react, discuss, publish, profile | — |
 | 1 | Open to strangers | Terms and ownership confirmation · report and takedown · public-coverage cap per book · reading trail | — |
 | 2 | Characters | Custom characters · Socratic check | Phase 1: takedown, reading trail |
-| 3 | Social | Follows · feed · same-passage reactions · comments | Phase 1: coverage cap, takedown |
-| 4 | More ways in | Readwise, Apple Books and Kobo imports · page-photo OCR · public-domain catalog | — (can run alongside 2 and 3) |
+| 3 | Design | Design and evaluation skills · UX audit · design system · redesign of every screen | Phase 2: all its screens exist |
+| 4 | Social | Follows · feed · same-passage reactions · comments | Phase 1: coverage cap, takedown · Phase 3: design system |
+| 5 | More ways in | Readwise, Apple Books and Kobo imports · page-photo OCR · public-domain catalog | — (can run alongside 2–4) |
 
 Changes from the order listed in PRODUCT.md:
 
@@ -25,6 +26,10 @@ Changes from the order listed in PRODUCT.md:
 - **Custom characters move from first to Phase 2.** Discussions with them
   appear on public profiles, so a persona written by a reader needs the
   report-and-takedown path to exist before it ships.
+- **A design phase comes before Social.** The product works but looks rough,
+  and Social adds the surfaces strangers will see most (feed, comments). Fixing
+  the design first means those screens are built once, on a design system,
+  instead of being redesigned later.
 
 Sizes (S / M / L) are rough estimates. Each feature is meant to be one devflow
 task. Social is the exception: it splits into its four parts.
@@ -44,7 +49,7 @@ profile that shows what someone read, not just the quotes they kept.
 - Contexts: profile, library, kindleimport. Web: sign-in, upload and import
   dialogs.
 - Not engineering work, but this phase can't finish without it: legal review
-  of the terms, the takedown process and, for Phase 4, what counts as public
+  of the terms, the takedown process and, for Phase 5, what counts as public
   domain where.
 
 ### Report and takedown — M
@@ -75,7 +80,7 @@ profile that shows what someone read, not just the quotes they kept.
   A trigger enforces it in the database too, like the other publishing
   guardrails.
 - The cap is a word count per work, configurable, with a per-work override in
-  catalog (Phase 4 exempts public-domain works).
+  catalog (Phase 5 exempts public-domain works).
 - Open: the cap value.
 - Open: what the reader sees when the cap is reached. Recommended: publish the
   reaction and collapse the passage to its citation, instead of refusing to
@@ -153,7 +158,49 @@ Socrates can examine them on a book they finished.
 - A finished book with enough quotes spread across it can be examined, and a
   pass shows a badge on the public profile.
 
-## Phase 3 — Social
+## Phase 3 — Design
+
+Goal: the product looks and feels good enough to put in front of strangers.
+Today every screen works, but they were built feature by feature without a
+design pass, and it shows.
+
+Build in this order: skills and evaluation → audit → design system →
+screens. No new features in this phase; API changes only where a screen
+genuinely needs data it can't get today.
+
+- **Design and evaluation skills — S.** Set up the Claude UI/UX skills the
+  design work will rely on (visual design, typography, interaction,
+  accessibility) and the evaluation expertise to judge the result: heuristic
+  review, accessibility review and design critique, each with a written
+  checklist. Decide here what "good" means for Serendipity, so later steps are
+  judged against it rather than taste.
+- **UX audit — S.** Run that evaluation over every current screen: sign-in and
+  terms, library and upload / Kindle import, the EPUB and PDF readers, the
+  quote workspace and discussion, `/characters`, the public profile, admin
+  reports and the takedown page. Each in light and dark mode, at phone width
+  (375 px) and desktop. Output: a ranked list of problems with screenshots.
+- **Design system — M.** Tokens for type scale, colour, spacing, radius and
+  elevation, in light and dark, defined once in Tailwind. Shared components
+  for buttons, inputs, cards, dialogs, tabs, empty states, loading and error
+  states, replacing today's one-off classes.
+- **Screen redesign — L.** In order of who sees them: the core loop (reader →
+  quote → reaction → discussion), then the public profile (what strangers see
+  first), then the library and `/characters`, and admin last. Each screen is
+  re-evaluated with the same checklist after it changes.
+- Open: the visual identity (logo or wordmark, typefaces, accent colour) —
+  settle it at the start of the design system step.
+
+### Phase 3 exit criteria
+
+- Every screen in the audit has been redesigned on the design system, and its
+  audit problems are fixed or consciously deferred.
+- Every screen passes the accessibility checklist: WCAG AA contrast, full
+  keyboard use, visible focus, labels for screen readers.
+- Every screen works at 375 px and on desktop, in light and dark mode.
+- Before-and-after screenshots of each screen are kept with the phase's
+  artifacts.
+
+## Phase 4 — Social
 
 Goal: readers find each other through what they think about the same books.
 
@@ -180,16 +227,17 @@ someone else's content.
   profile page come from a social endpoint or are composed in the web app.
   Profile never imports social.
 
-### Phase 3 exit criteria
+### Phase 4 exit criteria
 
 - A reader who follows others gets a paginated feed.
 - A public quote page shows other readers' reactions to the same passage.
 - An admin can hide a reported comment.
 
-## Phase 4 — More ways in
+## Phase 5 — More ways in
 
 Goal: fewer readers stuck at "bring your book". This phase doesn't depend on
-Phases 2 or 3 and can run alongside them if there's capacity.
+Phases 2, 3 or 4 and can run alongside them if there's capacity. New screens
+it adds use the Phase 3 design system.
 
 - **More imports — M each.** Readwise comes first, because one integration
   covers readers who already sync Apple Books, Kobo and other apps into it.
@@ -212,7 +260,7 @@ Phases 2 or 3 and can run alongside them if there's capacity.
   moving earlier if readers turn out to drop off between sign-up and their
   first quote, because it removes the need to own a file.
 
-### Phase 4 exit criteria
+### Phase 5 exit criteria
 
 - Each import source turns a real export into books and quotes, and
   re-importing the same file adds nothing.
