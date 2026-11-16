@@ -289,7 +289,7 @@ func TestStartConversationRefusesUnusableCharacters(t *testing.T) {
 			txm := &portstest.TxManager{}
 			quotes := &fakeQuotes{quotes: map[string]quote.Quote{reacted.ID: reacted}}
 			persona := unusable(tt.archived)
-			_, err := NewStartConversation(txm, quotes, &fakePersonas{persona: persona}, convs, model).
+			_, err := NewStartConversation(txm, quotes, &fakePersonas{persona: persona}, convs, model, &fakeReplyLog{}, testReplyLimit).
 				Execute(t.Context(), "u1", reacted.ID, persona.ID, out)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)

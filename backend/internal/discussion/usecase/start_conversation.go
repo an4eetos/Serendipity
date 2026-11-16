@@ -23,9 +23,11 @@ func NewStartConversation(
 	personas ports.PersonaRepository,
 	conversations ports.ConversationRepository,
 	model ports.CharacterModel,
+	replies ports.ReplyLog,
+	limit domain.ReplyLimit,
 ) *StartConversation {
 	return &StartConversation{
-		replier:  replier{txm: txm, conversations: conversations, model: model},
+		replier:  replier{txm: txm, conversations: conversations, model: model, replies: replies, limit: limit},
 		quotes:   quotes,
 		personas: personas,
 	}
@@ -48,6 +50,9 @@ func (uc *StartConversation) Execute(ctx context.Context, userID, quoteID, perso
 	}
 	var convID string
 	err = uc.txm.WithinTx(ctx, func(ctx context.Context) error {
+		if err := uc.reserve(ctx, userID); err != nil {
+			return err
+		}
 		var err error
 		convID, err = uc.conversations.Create(ctx, userID, q.ID, persona.ID)
 		return err

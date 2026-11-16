@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	kernel "github.com/an4eetos/serendipity/backend/internal/kernel/domain"
@@ -27,6 +28,10 @@ const (
 var (
 	// ErrCharacterName is returned for a blank or too long name.
 	ErrCharacterName = kernel.Invalid("name must be 1–" + strconv.Itoa(MaxCharacterNameLength) + " characters")
+	// ErrCharacterNameLine is returned for a name with line breaks, tabs or
+	// other control characters. The name goes into the shared rules of the
+	// system prompt, where a line break could start a rule of its own.
+	ErrCharacterNameLine = kernel.Invalid("name must be a single line without tabs")
 	// ErrCharacterEra is returned for a too long era.
 	ErrCharacterEra = kernel.Invalid("era must be at most " + strconv.Itoa(MaxCharacterEraLength) + " characters")
 	// ErrCharacterBio is returned for a too long short bio.
@@ -180,8 +185,8 @@ type CharacterDraft struct {
 	Name, Era, ShortBio, Prompt string
 }
 
-// Validate trims every field and checks, in order, the name, era, bio and
-// prompt lengths in characters. It returns the trimmed draft.
+// Validate trims every field and checks, in order, the name (length, then a
+// single line), the era, bio and prompt lengths in characters. It returns the trimmed draft.
 func (d CharacterDraft) Validate() (CharacterDraft, error) {
 	d = CharacterDraft{
 		Name:     strings.TrimSpace(d.Name),
@@ -191,6 +196,9 @@ func (d CharacterDraft) Validate() (CharacterDraft, error) {
 	}
 	if n := utf8.RuneCountInString(d.Name); n == 0 || n > MaxCharacterNameLength {
 		return CharacterDraft{}, ErrCharacterName
+	}
+	if strings.IndexFunc(d.Name, unicode.IsControl) >= 0 {
+		return CharacterDraft{}, ErrCharacterNameLine
 	}
 	if utf8.RuneCountInString(d.Era) > MaxCharacterEraLength {
 		return CharacterDraft{}, ErrCharacterEra

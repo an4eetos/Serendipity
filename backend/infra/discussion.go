@@ -20,6 +20,8 @@ var Discussion = fx.Module("discussion",
 		fx.Annotate(postgres.NewConversationRepository,
 			fx.As(new(ports.ConversationRepository)), fx.As(new(ports.ConversationModeration))),
 		fx.Annotate(newCharacterModel, fx.As(new(ports.CharacterModel))),
+		fx.Annotate(postgres.NewReplyLog, fx.As(new(ports.ReplyLog))),
+		newReplyLimit,
 		usecase.NewListPersonas,
 		usecase.NewGetThread,
 		usecase.NewStartConversation,
@@ -42,4 +44,10 @@ func newCharacterModel(cfg config.Config) *anthropic.Character {
 // newCharacterLimit provides how many active characters a reader may have.
 func newCharacterLimit(cfg config.Config) domain.CharacterLimit {
 	return domain.CharacterLimit(cfg.Characters.ActiveLimit)
+}
+
+// newReplyLimit provides how many character replies a reader may ask for
+// within domain.ReplyWindow.
+func newReplyLimit(cfg config.Config) domain.ReplyLimit {
+	return domain.ReplyLimit(cfg.Characters.RepliesPerHour)
 }

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/an4eetos/serendipity/backend/internal/discussion/domain"
 	"github.com/an4eetos/serendipity/backend/internal/discussion/ports"
@@ -101,6 +102,43 @@ func (f *fakeConversations) DeleteMessage(ctx context.Context, _ string, id int6
 	f.write(ctx, "delete message")
 	f.deletedMessages = append(f.deletedMessages, id)
 	return f.deleteErr
+}
+
+// testReplyLimit is the reply limit usecase tests run with unless they test
+// the limit itself.
+const testReplyLimit = domain.ReplyLimit(60)
+
+// fakeReplyLog holds the replies a reader asked for within the window:
+// recent from before the test, plus those added by it. It records calls made
+// outside a unit of work.
+type fakeReplyLog struct {
+	recent    int
+	added     int
+	calls     []string
+	outsideTx []string
+}
+
+func (l *fakeReplyLog) call(ctx context.Context, op string) {
+	l.calls = append(l.calls, op)
+	if !portstest.InTx(ctx) {
+		l.outsideTx = append(l.outsideTx, op)
+	}
+}
+
+func (l *fakeReplyLog) Lock(ctx context.Context, _ string) error {
+	l.call(ctx, "lock")
+	return nil
+}
+
+func (l *fakeReplyLog) CountSince(ctx context.Context, _ string, window time.Duration) (int, error) {
+	l.call(ctx, "count "+window.String())
+	return l.recent + l.added, nil
+}
+
+func (l *fakeReplyLog) Add(ctx context.Context, _ string, keep time.Duration) error {
+	l.call(ctx, "add "+keep.String())
+	l.added++
+	return nil
 }
 
 type fakeModel struct {

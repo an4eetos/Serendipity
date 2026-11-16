@@ -35,7 +35,7 @@ func newStart(model *fakeModel) startFixture {
 		out:   &fakeStream{},
 	}
 	quotes := &fakeQuotes{quotes: map[string]quote.Quote{reacted.ID: reacted, unreacted.ID: unreacted}}
-	f.uc = NewStartConversation(f.txm, quotes, &fakePersonas{persona: diogenes}, f.convs, model)
+	f.uc = NewStartConversation(f.txm, quotes, &fakePersonas{persona: diogenes}, f.convs, model, &fakeReplyLog{}, testReplyLimit)
 	return f
 }
 
@@ -117,7 +117,7 @@ func TestStartConversation(t *testing.T) {
 func newPost(conv domain.Conversation, model *fakeModel) (*PostMessage, *fakeConversations, *fakeStream) {
 	convs := &fakeConversations{conv: conv}
 	quotes := &fakeQuotes{quotes: map[string]quote.Quote{reacted.ID: reacted, unreacted.ID: unreacted}}
-	return NewPostMessage(&portstest.TxManager{}, quotes, convs, model), convs, &fakeStream{}
+	return NewPostMessage(&portstest.TxManager{}, quotes, convs, model, &fakeReplyLog{}, testReplyLimit), convs, &fakeStream{}
 }
 
 func TestPostMessage(t *testing.T) {

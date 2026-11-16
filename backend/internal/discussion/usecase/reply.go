@@ -25,6 +25,27 @@ type replier struct {
 	txm           kernelports.TxManager
 	conversations ports.ConversationRepository
 	model         ports.CharacterModel
+	replies       ports.ReplyLog
+	limit         domain.ReplyLimit
+}
+
+// reserve counts one more reply for userID against their limit, or returns
+// domain.ErrReplyLimit. Call it in the transaction that stores the request:
+// the lock makes one reader's concurrent requests count one after another.
+// A reply that then fails still counts, since the model may have been paid
+// for it.
+func (r replier) reserve(ctx context.Context, userID string) error {
+	if err := r.replies.Lock(ctx, userID); err != nil {
+		return err
+	}
+	recent, err := r.replies.CountSince(ctx, userID, domain.ReplyWindow)
+	if err != nil {
+		return err
+	}
+	if err := r.limit.CheckRoom(recent); err != nil {
+		return err
+	}
+	return r.replies.Add(ctx, userID, domain.ReplyWindow)
 }
 
 // answer streams the character's reply to out and stores it. The reader may

@@ -18,6 +18,8 @@ const (
 	KindUnavailable
 	// KindForbidden means the caller may not do this.
 	KindForbidden
+	// KindRateLimited means the caller did this too often and must wait.
+	KindRateLimited
 )
 
 // DomainError is a business rule violation with a constant, reader-facing
@@ -49,6 +51,10 @@ func Unavailable(msg string) *Error { return &Error{kind: KindUnavailable, msg: 
 // Forbidden returns an error for an action the caller may not take, such as a
 // write before accepting the terms or an admin route for a reader.
 func Forbidden(msg string) *Error { return &Error{kind: KindForbidden, msg: msg} }
+
+// RateLimited returns an error for an action the caller has done too often
+// for now, such as asking characters for too many replies in an hour.
+func RateLimited(msg string) *Error { return &Error{kind: KindRateLimited, msg: msg} }
 
 // ErrNotFound is returned for anything that does not exist or is not the
 // caller's to see.

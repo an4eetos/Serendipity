@@ -15,6 +15,7 @@ import (
 var countedTables = []string{
 	"auth.users", "profiles", "works", "library_items", "quotes", "conversations",
 	"messages", "reports", "takedowns", "admins", "storage.objects", "personas",
+	"character_replies",
 }
 
 const countRowsSQL = `
@@ -29,7 +30,8 @@ const countRowsSQL = `
 	       (select count(*) from public.takedowns),
 	       (select count(*) from public.admins),
 	       (select count(*) from storage.objects),
-	       (select count(*) from public.personas)`
+	       (select count(*) from public.personas),
+	       (select count(*) from public.character_replies)`
 
 // rowCounts maps a table name to its row count.
 type rowCounts map[string]int64

@@ -60,6 +60,8 @@ func StatusOf(err kernel.DomainError) int {
 		return http.StatusBadGateway
 	case kernel.KindForbidden:
 		return http.StatusForbidden
+	case kernel.KindRateLimited:
+		return http.StatusTooManyRequests
 	}
 	return http.StatusInternalServerError
 }

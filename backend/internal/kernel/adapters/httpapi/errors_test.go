@@ -24,6 +24,7 @@ func TestWriteError(t *testing.T) {
 		{"conflict", kernel.Conflict("taken"), http.StatusConflict, `{"error":"taken"}`},
 		{"unavailable", errDown, http.StatusBadGateway, `{"error":"search is down"}`},
 		{"forbidden", kernel.Forbidden("admins only"), http.StatusForbidden, `{"error":"admins only"}`},
+		{"rate limited", kernel.RateLimited("slow down"), http.StatusTooManyRequests, `{"error":"slow down"}`},
 		{"wrapped forbidden", fmt.Errorf("gate: %w", kernel.Forbidden("accept the terms")), http.StatusForbidden, `{"error":"accept the terms"}`},
 		{"joined domain error keeps its message", errors.Join(errDown, errors.New("dial tcp")), http.StatusBadGateway, `{"error":"search is down"}`},
 		{"unexpected", errors.New("boom"), http.StatusInternalServerError, `{"error":"internal error"}`},

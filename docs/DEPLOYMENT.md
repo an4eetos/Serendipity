@@ -51,7 +51,7 @@ CI (done): [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs gofmt,
    ```sh
    npx supabase login
    npx supabase link --project-ref <ref>
-   npx supabase db push --dry-run          # should list the 4 migrations
+   npx supabase db push --dry-run          # should list the 5 migrations
    npx supabase db push --include-seed     # migrations + preset characters
    ```
 
@@ -95,6 +95,7 @@ Create one project from the GitHub repo with two services. Generate both public 
 | `TERMS_VERSION` | the version of the terms you publish (e.g. `2026-11-01`) |
 | `PUBLIC_WORD_CAP` | `2500` |
 | `CUSTOM_CHARACTER_LIMIT` | `20` (the default): active custom characters per reader. Archived and removed characters don't count; an admin restore may exceed it. |
+| `CHARACTER_REPLIES_PER_HOUR` | `60` (the default): character replies one reader may ask for in an hour; past it, new discussions and messages get 429. It caps what one account can spend; keep a spend limit on the Anthropic workspace too. |
 
 ### `web` service
 
@@ -152,8 +153,9 @@ Create one project from the GitHub repo with two services. Generate both public 
   Other effects of Phase 1 code on the Phase 2 schema, all harmless: the picker lists archived and removed characters, and starting a discussion with one fails with a 500 from the trigger; character reports and takedowns appear on the admin page without content and can't be restored there.
 
   The exception is undoing a phase entirely, with the hand-written scripts under `supabase/rollback/`, newest first and only after redeploying the matching older API and web:
-  1. [`supabase/rollback/20261116000000_phase2_custom_characters.down.sql`](../supabase/rollback/20261116000000_phase2_custom_characters.down.sql) returns the schema to Phase 1. It drops archive state, turns "depicts a living person" reports into "other", dismisses open character reports, and refuses to run while a removed character exists.
-  2. Then, optionally, [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0. It drops moderation data, refuses to run while removed discussions exist, and refuses to run until the Phase 2 script has.
+  1. [`supabase/rollback/20261117000000_character_reply_log.down.sql`](../supabase/rollback/20261117000000_character_reply_log.down.sql) drops the reply log. Readers start a fresh hour.
+  2. [`supabase/rollback/20261116000000_phase2_custom_characters.down.sql`](../supabase/rollback/20261116000000_phase2_custom_characters.down.sql) returns the schema to Phase 1. It drops archive state, turns "depicts a living person" reports into "other", dismisses open character reports, and refuses to run while a removed character exists.
+  3. Then, optionally, [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0. It drops moderation data, refuses to run while removed discussions exist, and refuses to run until the Phase 2 script has.
 
   Read each script's header first.
 - **Config bumps**: changing `TERMS_VERSION` on `api` and redeploying makes every reader accept the terms again.

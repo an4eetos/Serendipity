@@ -11,14 +11,15 @@ import (
 func setEnv(t *testing.T, vars map[string]*string) {
 	t.Helper()
 	base := map[string]*string{
-		"DATABASE_URL":              ptr("postgresql://user@127.0.0.1:5432/db"),
-		"SUPABASE_URL":              ptr("http://127.0.0.1:54321"),
-		"SUPABASE_SERVICE_ROLE_KEY": ptr("test-only"),
-		"API_ADDR":                  nil,
-		"PORT":                      nil,
-		"TERMS_VERSION":             nil,
-		"PUBLIC_WORD_CAP":           nil,
-		"CUSTOM_CHARACTER_LIMIT":    nil,
+		"DATABASE_URL":               ptr("postgresql://user@127.0.0.1:5432/db"),
+		"SUPABASE_URL":               ptr("http://127.0.0.1:54321"),
+		"SUPABASE_SERVICE_ROLE_KEY":  ptr("test-only"),
+		"API_ADDR":                   nil,
+		"PORT":                       nil,
+		"TERMS_VERSION":              nil,
+		"PUBLIC_WORD_CAP":            nil,
+		"CUSTOM_CHARACTER_LIMIT":     nil,
+		"CHARACTER_REPLIES_PER_HOUR": nil,
 	}
 	for k, v := range vars {
 		base[k] = v
@@ -130,6 +131,38 @@ func TestLoadCustomCharacterLimit(t *testing.T) {
 			}
 			if err != nil || c.Characters.ActiveLimit != tt.want {
 				t.Errorf("Load() = %d, %v; want %d", c.Characters.ActiveLimit, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCharacterRepliesPerHour(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   *string
+		want    int
+		wantErr bool
+	}{
+		{"unset means the default", nil, 60, false},
+		{"empty means the default", ptr(""), 60, false},
+		{"a limit", ptr("120"), 120, false},
+		{"one reply", ptr("1"), 1, false},
+		{"zero", ptr("0"), 0, true},
+		{"negative", ptr("-5"), 0, true},
+		{"not a number", ptr("lots"), 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnv(t, map[string]*string{"CHARACTER_REPLIES_PER_HOUR": tt.value})
+			c, err := Load()
+			if tt.wantErr {
+				if err == nil || err.Error() != "CHARACTER_REPLIES_PER_HOUR must be a positive whole number" {
+					t.Errorf("Load() err = %v, want the CHARACTER_REPLIES_PER_HOUR error", err)
+				}
+				return
+			}
+			if err != nil || c.Characters.RepliesPerHour != tt.want {
+				t.Errorf("Load() = %d, %v; want %d", c.Characters.RepliesPerHour, err, tt.want)
 			}
 		})
 	}

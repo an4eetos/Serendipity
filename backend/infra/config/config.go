@@ -17,6 +17,9 @@ const (
 	// defaultCustomCharacterLimit is how many active characters a reader may
 	// have when CUSTOM_CHARACTER_LIMIT is unset.
 	defaultCustomCharacterLimit = 20
+	// defaultRepliesPerHour is how many character replies a reader may ask
+	// for in an hour when CHARACTER_REPLIES_PER_HOUR is unset.
+	defaultRepliesPerHour = 60
 	// maxTermsVersionLength is the limit of profiles.terms_version.
 	maxTermsVersionLength = 64
 )
@@ -25,6 +28,7 @@ var (
 	errTermsVersion         = errors.New("TERMS_VERSION must be 1 to 64 characters")
 	errPublicWordCap        = errors.New("PUBLIC_WORD_CAP must be a positive whole number")
 	errCustomCharacterLimit = errors.New("CUSTOM_CHARACTER_LIMIT must be a positive whole number")
+	errRepliesPerHour       = errors.New("CHARACTER_REPLIES_PER_HOUR must be a positive whole number")
 )
 
 type Config struct {
@@ -79,6 +83,9 @@ type Characters struct {
 	// ActiveLimit is how many characters a reader may have that are neither
 	// archived nor removed.
 	ActiveLimit int
+	// RepliesPerHour is how many character replies a reader may ask for
+	// within an hour.
+	RepliesPerHour int
 }
 
 // Load reads the configuration from the environment.
@@ -113,7 +120,11 @@ func Load() (Config, error) {
 	if err != nil {
 		return c, err
 	}
-	c.Characters = Characters{ActiveLimit: characterLimit}
+	repliesPerHour, err := characterRepliesPerHour(os.Getenv("CHARACTER_REPLIES_PER_HOUR"))
+	if err != nil {
+		return c, err
+	}
+	c.Characters = Characters{ActiveLimit: characterLimit, RepliesPerHour: repliesPerHour}
 	var missing []string
 	for _, v := range []struct{ name, value string }{
 		{"DATABASE_URL", c.Database.URL},
@@ -179,6 +190,20 @@ func customCharacterLimit(raw string) (int, error) {
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 1 {
 		return 0, errCustomCharacterLimit
+	}
+	return n, nil
+}
+
+// characterRepliesPerHour parses CHARACTER_REPLIES_PER_HOUR like
+// publicWordCap: unset means the default, anything else must be a whole
+// number of at least 1.
+func characterRepliesPerHour(raw string) (int, error) {
+	if raw == "" {
+		return defaultRepliesPerHour, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, errRepliesPerHour
 	}
 	return n, nil
 }

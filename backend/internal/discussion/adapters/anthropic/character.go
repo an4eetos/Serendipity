@@ -12,6 +12,13 @@ import (
 	"github.com/an4eetos/serendipity/backend/internal/discussion/domain"
 )
 
+// maxReplyTokens caps one reply, thinking included: the model's thinking
+// can't be turned off and counts toward it. The shared rules ask for a few
+// short paragraphs (a few hundred tokens), so this leaves room to think while
+// bounding the cost of a reply and how much text a prompt that ignores the
+// rules can get out of one.
+const maxReplyTokens = 2048
+
 // Character streams character replies from Claude.
 type Character struct {
 	api   anthropic.Client
@@ -48,7 +55,7 @@ func buildMessages(turns []domain.Turn) []anthropic.BetaMessageParam {
 func (c *Character) Reply(ctx context.Context, p domain.CharacterPrompt, onText func(string) error) (string, error) {
 	params := anthropic.BetaMessageNewParams{
 		Model:     anthropic.Model(c.model),
-		MaxTokens: 4096,
+		MaxTokens: maxReplyTokens,
 		System:    []anthropic.BetaTextBlockParam{{Text: p.System}},
 		Messages:  buildMessages(p.Turns),
 		// Short conversational replies: low effort keeps them quick.

@@ -21,9 +21,11 @@ func NewPostMessage(
 	quotes quoteports.QuoteRepository,
 	conversations ports.ConversationRepository,
 	model ports.CharacterModel,
+	replies ports.ReplyLog,
+	limit domain.ReplyLimit,
 ) *PostMessage {
 	return &PostMessage{
-		replier: replier{txm: txm, conversations: conversations, model: model},
+		replier: replier{txm: txm, conversations: conversations, model: model, replies: replies, limit: limit},
 		quotes:  quotes,
 	}
 }
@@ -55,6 +57,9 @@ func (uc *PostMessage) Execute(ctx context.Context, userID, conversationID, cont
 	}
 	var userMsg domain.Message
 	err = uc.txm.WithinTx(ctx, func(ctx context.Context) error {
+		if err := uc.reserve(ctx, userID); err != nil {
+			return err
+		}
 		var err error
 		userMsg, err = uc.conversations.AppendMessage(ctx, conv.ID, domain.RoleUser, content)
 		return err

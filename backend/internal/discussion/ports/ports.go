@@ -3,6 +3,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/an4eetos/serendipity/backend/internal/discussion/domain"
 )
@@ -86,6 +87,19 @@ type ConversationModeration interface {
 	// Restore clears them. It returns kernel.ErrNotFound unless the
 	// conversation exists and is removed.
 	Restore(ctx context.Context, id string) error
+}
+
+// ReplyLog records the character replies readers ask for, so that usecases
+// can limit them. Its methods run in the caller's transaction.
+type ReplyLog interface {
+	// Lock holds userID's log until the transaction ends, so that one
+	// reader's concurrent requests are counted one after another.
+	Lock(ctx context.Context, userID string) error
+	// CountSince returns how many replies userID asked for within window.
+	CountSince(ctx context.Context, userID string, window time.Duration) (int, error)
+	// Add records one reply for userID and forgets their entries older than
+	// keep.
+	Add(ctx context.Context, userID string, keep time.Duration) error
 }
 
 // CharacterModel generates characters' replies.

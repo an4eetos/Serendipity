@@ -83,6 +83,11 @@ Besides the Supabase and Anthropic settings, the API reads:
   many active characters one reader may have. Archived and removed characters
   don't count. Creating or unarchiving one past the limit fails with 409; an
   admin restoring a removed character may exceed it.
+- `CHARACTER_REPLIES_PER_HOUR` (default `60`, a whole number of at least 1):
+  how many character replies one reader may ask for in an hour, counting new
+  discussions and messages. Past it, both fail with 429 before anything is
+  stored or sent to the model. A reply that fails still counts, and deleting
+  a discussion doesn't give its replies back.
 
 Admins are listed in the `admins` table. Add the first one in the SQL editor:
 
@@ -146,8 +151,8 @@ admins only (otherwise 403).
 | PATCH | `/characters/{id}` | Edit your character; the name is locked once it has been in a discussion (409) |
 | POST | `/characters/{id}/archive` | Archive your character: it leaves the picker and its discussions become read-only |
 | POST | `/characters/{id}/unarchive` | Unarchive your character (409 past `CUSTOM_CHARACTER_LIMIT`) |
-| POST | `/conversations` | Discuss a quote's reaction with a character (needs a reaction); streams SSE |
-| POST | `/conversations/{id}/messages` | Reply; streams SSE |
+| POST | `/conversations` | Discuss a quote's reaction with a character (needs a reaction); streams SSE (429 past `CHARACTER_REPLIES_PER_HOUR`) |
+| POST | `/conversations/{id}/messages` | Reply; streams SSE (429 past `CHARACTER_REPLIES_PER_HOUR`) |
 | POST | `/reports` | Report a public quote, discussion or character |
 | GET | `/admin/reports` | Admin: open reports, grouped by target |
 | POST | `/admin/reports/dismiss` | Admin: dismiss a target's open reports |

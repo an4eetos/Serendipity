@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -47,6 +48,21 @@ func (fakeConversations) AppendMessage(_ context.Context, _ string, role domain.
 	return domain.Message{ID: 7, Role: role, Content: content}, nil
 }
 
+// fakeReplies is a reply log in which the reader already asked for recent
+// replies.
+type fakeReplies struct{ recent int }
+
+func (fakeReplies) Lock(context.Context, string) error { return nil }
+
+func (f fakeReplies) CountSince(context.Context, string, time.Duration) (int, error) {
+	return f.recent, nil
+}
+
+func (fakeReplies) Add(context.Context, string, time.Duration) error { return nil }
+
+// replyLimit is the reply limit the handler tests run with.
+const replyLimit = domain.ReplyLimit(3)
+
 type fakeModel struct{ err error }
 
 func (m fakeModel) Reply(_ context.Context, _ domain.CharacterPrompt, onText func(string) error) (string, error) {
@@ -61,9 +77,10 @@ func (m fakeModel) Reply(_ context.Context, _ domain.CharacterPrompt, onText fun
 	return "Hello", nil
 }
 
-func serve(t *testing.T, model ports.CharacterModel, body string) *httptest.ResponseRecorder {
+func serve(t *testing.T, model ports.CharacterModel, recentReplies int, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	start := usecase.NewStartConversation(&portstest.TxManager{}, fakeQuotes{}, fakePersonas{}, fakeConversations{}, model)
+	start := usecase.NewStartConversation(&portstest.TxManager{}, fakeQuotes{}, fakePersonas{}, fakeConversations{}, model,
+		fakeReplies{recent: recentReplies}, replyLimit)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +94,7 @@ func serve(t *testing.T, model ports.CharacterModel, body string) *httptest.Resp
 }
 
 func TestCreateConversationStreams(t *testing.T) {
-	w := serve(t, fakeModel{}, `{"quote_id":"reacted","persona_id":"p1"}`)
+	w := serve(t, fakeModel{}, 0, `{"quote_id":"reacted","persona_id":"p1"}`)
 	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "text/event-stream" {
 		t.Fatalf("status %d, Content-Type %q", w.Code, w.Header().Get("Content-Type"))
 	}
@@ -94,6 +111,7 @@ func TestCreateConversationFailures(t *testing.T) {
 	tests := []struct {
 		name       string
 		model      fakeModel
+		recent     int
 		body       string
 		wantStatus int
 		wantBody   string
@@ -103,6 +121,13 @@ func TestCreateConversationFailures(t *testing.T) {
 			body:       `{"quote_id":"bare","persona_id":"p1"}`,
 			wantStatus: http.StatusBadRequest,
 			wantBody:   `{"error":"write your reaction first"}` + "\n",
+		},
+		{
+			name:       "over the reply limit, before streaming",
+			recent:     int(replyLimit),
+			body:       `{"quote_id":"reacted","persona_id":"p1"}`,
+			wantStatus: http.StatusTooManyRequests,
+			wantBody:   `{"error":"you've reached the hourly limit of character replies — try again later"}` + "\n",
 		},
 		{
 			name:       "unknown field",
@@ -129,7 +154,7 @@ func TestCreateConversationFailures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := serve(t, tt.model, tt.body)
+			w := serve(t, tt.model, tt.recent, tt.body)
 			if w.Code != tt.wantStatus || w.Body.String() != tt.wantBody {
 				t.Errorf("got %d %q\nwant %d %q", w.Code, w.Body.String(), tt.wantStatus, tt.wantBody)
 			}

@@ -34,6 +34,7 @@ go.work.sum
 
 # Keep .claude/ workflow assets versioned, even when a global ignore rule matches them
 !.claude/
-!**/.claude/settings.local.json
+# ...but not personal Claude Code settings (local permissions, paths)
+.claude/settings.local.json
 
 artifacts/*
