@@ -7,7 +7,8 @@ A reading platform for people who actually read. You highlight passages from
 is the point: your perspective next to the author's.
 
 If you want to go further, you can **discuss your reaction** with a character —
-Socrates, Diogenes, Seneca, Marcus Aurelius, Nietzsche, Montaigne. The
+Socrates, Diogenes, Alexander the Great, Seneca, Marcus Aurelius, Nietzsche,
+Montaigne. The
 character doesn't give its own take on the passage; it talks with you about
 what *you* wrote: questions it, builds on it, pushes back where it would.
 

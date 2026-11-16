@@ -34,7 +34,7 @@ Backend and database (done):
 - `infra/config`: the listen address is `API_ADDR` if set, otherwise `:$PORT` (set by Railway), otherwise `:8787`. Leave `API_ADDR` **unset** on Railway.
 - [`supabase/seed.sql`](../supabase/seed.sql): `on conflict (slug) do nothing`, so running the seed again is harmless.
 
-Verified locally: `go test ./...` passes. The image starts on `$PORT` against local Supabase and serves `/healthz` and `/terms`. It applies CORS for `ALLOWED_ORIGINS` and exits 0 on SIGTERM. It exits 1 when the database is unreachable, which fails the Railway health check and keeps the previous deploy serving. The seed runs twice without error and leaves 6 presets.
+Verified locally: `go test ./...` passes. The image starts on `$PORT` against local Supabase and serves `/healthz` and `/terms`. It applies CORS for `ALLOWED_ORIGINS` and exits 0 on SIGTERM. It exits 1 when the database is unreachable, which fails the Railway health check and keeps the previous deploy serving. The seed runs twice without error and leaves 7 presets.
 
 Web (done):
 
@@ -55,7 +55,7 @@ CI (done): [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs gofmt,
    npx supabase db push --include-seed     # migrations + preset characters
    ```
 
-   Running the seed again skips presets that already exist. Check that `select slug from public.personas where is_preset;` returns 6 rows and that the `books` bucket exists under Storage.
+   Running the seed again skips presets that already exist. Check that `select slug from public.personas where is_preset;` returns 7 rows and that the `books` bucket exists under Storage.
 3. **Auth → URL configuration**
    - Site URL: `https://<web domain>`
    - Redirect URLs: `https://<web domain>/**`. Add the custom domain here too when you get one.
@@ -158,6 +158,7 @@ Create one project from the GitHub repo with two services. Generate both public 
   3. Then, optionally, [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0. It drops moderation data, refuses to run while removed discussions exist, and refuses to run until the Phase 2 script has.
 
   Read each script's header first.
+- **New preset characters**: presets live in [`supabase/seed.sql`](../supabase/seed.sql), which `db push` doesn't re-run on an existing database. Run it by hand after a new preset lands: `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -1 -f supabase/seed.sql`. Existing presets are skipped (`on conflict (slug) do nothing`), so changing an existing preset's prompt needs its own `update`.
 - **Config bumps**: changing `TERMS_VERSION` on `api` and redeploying makes every reader accept the terms again.
 - **Watch**: Railway logs (chi's request log, `slog` errors), the Supabase database CPU and connection count, and Anthropic spend.
 - **Secrets**: rotate the service key or Anthropic key by updating the Railway variable, which redeploys the service. Never commit `backend/.env` or `web/.env.local`.
