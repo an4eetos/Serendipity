@@ -16,24 +16,14 @@ const MaxMessageLength = 4000
 var (
 	ErrMessageLength = kernel.Invalid("message must be 1–" + strconv.Itoa(MaxMessageLength) + " characters")
 	ErrNotYourTurn   = kernel.Conflict("wait for the character to answer first")
+	// ErrConversationRemoved is returned for a new message in a discussion a
+	// moderator removed: it is read-only.
+	ErrConversationRemoved = kernel.Conflict("a moderator removed this discussion — it can't continue")
 
 	ErrRefused              = kernel.Invalid("the character declined to respond to this")
 	ErrCharacterUnavailable = kernel.Unavailable("the character could not answer right now — try again")
 	ErrReplyNotSaved        = kernel.Unavailable("could not save the reply")
 )
-
-// Persona is a character readers discuss their reactions with.
-type Persona struct {
-	ID       string
-	Slug     string
-	Name     string
-	Era      string
-	ShortBio string
-	// SystemPrompt describes the character to the model. It is never shown
-	// to readers.
-	SystemPrompt string
-	IsPreset     bool
-}
 
 type Role string
 

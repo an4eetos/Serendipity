@@ -1,6 +1,7 @@
 //go:build e2e
 
-// Package e2e runs the Phase 1 ("Open to strangers") API scenario end to end
+// Package e2e runs the Phase 1 ("Open to strangers") and Phase 2 ("Custom
+// characters") API scenario end to end
 // against the local stack: the real server binary built from ./cmd/server,
 // real JWTs from local Supabase Auth, real Supabase Storage and the local
 // Postgres. It replaces the uncommitted script described in
@@ -19,10 +20,14 @@
 //   - SUPABASE_ANON_KEY signs the users in. When it is unset, ANON_KEY is
 //     read from `npx supabase status -o env` in the repository root.
 //
-// The server runs on a free 127.0.0.1 port with PUBLIC_WORD_CAP=12 and
-// TERMS_VERSION=e2e-<random>. Three throwaway users (readers A and B, admin
-// C) are created with tagged emails (e2e-<hex>-a@example.test). Only the
-// admins row and one answered discussion are inserted with SQL. Cleanup is
+// The server runs on a free 127.0.0.1 port with PUBLIC_WORD_CAP=12,
+// CUSTOM_CHARACTER_LIMIT=2 and TERMS_VERSION=e2e-<random>. Its model client
+// points at a closed local port (ANTHROPIC_BASE_URL), so no request ever
+// reaches Anthropic and no key is needed. Three throwaway users (readers A
+// and B, admin C) are created with tagged emails
+// (e2e-<hex>-a@example.test). Only the admins row and two answered
+// discussions (one with a preset, one with A's character) are inserted with
+// SQL. Cleanup is
 // registered before anything is created, so it also runs after a failure:
 // it stops the server, deletes the storage objects, the users (which
 // cascades to their data) and the tagged works, and checks that nothing
@@ -44,7 +49,12 @@ const (
 	// publicWordCap is the server's PUBLIC_WORD_CAP: two 8-word passages
 	// overflow it.
 	publicWordCap = "12"
-	httpTimeout   = 30 * time.Second
+	// characterLimit is the server's CUSTOM_CHARACTER_LIMIT.
+	characterLimit = "2"
+	// closedModelURL is where the server's model client sends requests: a
+	// closed local port, so a reply fails fast and nothing leaves the machine.
+	closedModelURL = "http://127.0.0.1:9"
+	httpTimeout    = 30 * time.Second
 )
 
 // reader is one throwaway user.
@@ -81,12 +91,23 @@ type scenario struct {
 	q1, q2, q3  string // A's shown and collapsed quotes; B's identical passage
 	conv        string // the answered discussion of q1
 	takedown    string
-	cleaned     bool
+
+	// Phase 2: A's characters, the discussion with char1, and the takedowns
+	// of char1 and of that discussion.
+	charPrompt     string
+	char1, char2   string
+	char3          string
+	charConv       string
+	charTakedown   string
+	charConvRemove string
+
+	cleaned bool
 }
 
 // TestPhase1Scenario walks the Phase 1 API scenario: terms, ownership,
 // storage, the public word cap, the public profile, reports, moderation and
-// cleanup. Each step is a subtest, and each check inside it is its own
+// cleanup, and Phase 2's custom characters: the cap, the name lock, archive,
+// reports, takedowns and the prompt's privacy. Each step is a subtest, and each check inside it is its own
 // subtest, so a failure names the step.
 func TestPhase1Scenario(t *testing.T) {
 	if os.Getenv("E2E") != "1" {
@@ -110,7 +131,10 @@ func TestPhase1Scenario(t *testing.T) {
 		{"5_public_profile", s.stepPublicProfile},
 		{"6_reports", s.stepReports},
 		{"7_admin", s.stepAdmin},
-		{"8_cleanup", s.stepCleanup},
+		{"8_characters", s.stepCharacters},
+		{"9_character_archive", s.stepCharacterArchive},
+		{"10_character_moderation", s.stepCharacterModeration},
+		{"11_cleanup", s.stepCleanup},
 	}
 	for _, st := range steps {
 		t.Run(st.name, st.run)
@@ -137,7 +161,8 @@ func (s *scenario) setup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := append(s.cfg.serverEnv, "PUBLIC_WORD_CAP="+publicWordCap, "TERMS_VERSION="+s.terms)
+	env := append(s.cfg.serverEnv, "PUBLIC_WORD_CAP="+publicWordCap, "TERMS_VERSION="+s.terms,
+		"CUSTOM_CHARACTER_LIMIT="+characterLimit, "ANTHROPIC_BASE_URL="+closedModelURL, "ANTHROPIC_API_KEY=e2e-unused")
 	s.srv, err = startServer(bin, s.tmpDir, env)
 	if err != nil {
 		t.Fatalf("start the server: %v", err)

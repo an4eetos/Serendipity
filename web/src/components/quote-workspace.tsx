@@ -1,17 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { del, get, patch, stream } from "@/lib/api";
+import { loadPersonas } from "@/lib/personas";
 import type { Conversation, Message, Persona, Quote, QuoteWithConversations } from "@/lib/types";
-
-let personasCache: Promise<Persona[]> | undefined;
-function loadPersonas() {
-  personasCache ??= get<Persona[]>("/personas").catch((e) => {
-    personasCache = undefined;
-    throw e;
-  });
-  return personasCache;
-}
 
 export function Citation({ quote }: { quote: Quote }) {
   return (
@@ -95,6 +88,7 @@ export function QuoteWorkspace({ quoteId, onChange, onDeleted }: Props) {
       <Discussions
         quote={quote}
         personas={personas}
+        onPersonas={setPersonas}
         conversations={quote.conversations}
         setConversations={(fn) =>
           setQuote((prev) => (prev ? { ...prev, conversations: fn(prev.conversations) } : prev))
@@ -205,11 +199,13 @@ type SetConversations = (fn: (prev: Conversation[]) => Conversation[]) => void;
 function Discussions({
   quote,
   personas,
+  onPersonas,
   conversations,
   setConversations,
 }: {
   quote: Quote;
   personas: Persona[];
+  onPersonas: (p: Persona[]) => void;
   conversations: Conversation[];
   setConversations: SetConversations;
 }) {
@@ -218,8 +214,17 @@ function Discussions({
   const [pending, setPending] = useState<{ persona: Persona; text: string }>();
   const [error, setError] = useState<string>();
 
-  const persona = personas.find((p) => p.id === (personaId ?? personas[0]?.id));
+  // Fall back to the first character when the picked one is gone (archived since).
+  const persona = personas.find((p) => p.id === personaId) ?? personas[0];
   const hasReaction = quote.reaction.trim() !== "";
+
+  function openPicker() {
+    setOpen(true);
+    // Cheap when cached; fresh after a change on the Characters page.
+    loadPersonas()
+      .then(onPersonas)
+      .catch((e: Error) => setError(e.message));
+  }
 
   async function start() {
     if (!persona) return;
@@ -277,7 +282,7 @@ function Discussions({
           Once you&apos;ve saved your reaction, you can discuss it with a character if you want.
         </p>
       ) : !open ? (
-        <button className="btn" disabled={!!pending} onClick={() => setOpen(true)}>
+        <button className="btn" disabled={!!pending} onClick={openPicker}>
           {conversations.length ? "Discuss with someone else" : "Discuss your reaction with a character"}
         </button>
       ) : (
@@ -296,6 +301,12 @@ function Discussions({
                 {p.name}
               </button>
             ))}
+            <Link
+              href="/characters"
+              className="rounded-full border border-dashed border-line px-3 py-1 text-sm text-muted transition hover:border-muted hover:text-ink"
+            >
+              + New character
+            </Link>
           </div>
           {persona && <p className="text-xs text-muted">{persona.short_bio}</p>}
           <div className="flex gap-2">
@@ -319,6 +330,7 @@ function Thread({ conversation, setConversations }: { conversation: Conversation
   const [error, setError] = useState<string>();
   const bottom = useRef<HTMLDivElement>(null);
   const name = conversation.persona.name;
+  const status = conversation.persona.status;
 
   function update(fn: (c: Conversation) => Conversation) {
     setConversations((prev) => prev.map((c) => (c.id === conversation.id ? fn(c) : c)));
@@ -371,18 +383,36 @@ function Thread({ conversation, setConversations }: { conversation: Conversation
         <MessageBubble key={m.id} message={m} personaName={name} />
       ))}
       {pending !== undefined && <MessageBubble message={{ role: "assistant", content: pending || "…" }} personaName={name} />}
-      <form onSubmit={send} className="flex gap-2">
-        <input
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          placeholder={`Answer ${name}…`}
-          disabled={pending !== undefined}
-          className="input"
-        />
-        <button className="btn" disabled={pending !== undefined || !reply.trim()}>
-          Send
-        </button>
-      </form>
+      {conversation.removed_at ? (
+        <p className="rounded-md border border-danger px-3 py-2 text-sm text-danger">
+          A moderator removed this discussion. It&apos;s read-only.
+        </p>
+      ) : status === "archived" ? (
+        <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
+          This character is archived. Unarchive it on the{" "}
+          <Link href="/characters" className="underline">
+            Characters
+          </Link>{" "}
+          page to continue.
+        </p>
+      ) : status === "removed" ? (
+        <p className="rounded-md border border-danger px-3 py-2 text-sm text-danger">
+          A moderator removed this character. This discussion is read-only.
+        </p>
+      ) : (
+        <form onSubmit={send} className="flex gap-2">
+          <input
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            placeholder={`Answer ${name}…`}
+            disabled={pending !== undefined}
+            className="input"
+          />
+          <button className="btn" disabled={pending !== undefined || !reply.trim()}>
+            Send
+          </button>
+        </form>
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
       <div ref={bottom} />
     </div>

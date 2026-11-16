@@ -22,8 +22,8 @@ const (
 
 // Errors of reports.
 var (
-	ErrInvalidTarget   = kernel.Invalid("you can report a quote or a discussion")
-	ErrInvalidReason   = kernel.Invalid("pick a reason: copyright, harassment, hate, spam or other")
+	ErrInvalidTarget   = kernel.Invalid("you can report a quote, a discussion or a character")
+	ErrInvalidReason   = kernel.Invalid("pick a reason: copyright, harassment, hate, spam, living person or other")
 	ErrNoteTooLong     = kernel.Invalid("the note is longer than 1000 characters")
 	ErrAlreadyReported = kernel.Conflict("you already reported this")
 )
@@ -36,11 +36,13 @@ const (
 	TargetQuote TargetKind = "quote"
 	// TargetConversation is a discussion of a quote with a character.
 	TargetConversation TargetKind = "conversation"
+	// TargetCharacter is a reader's own character.
+	TargetCharacter TargetKind = "character"
 )
 
 // Valid reports whether k is a kind readers can report.
 func (k TargetKind) Valid() bool {
-	return k == TargetQuote || k == TargetConversation
+	return k == TargetQuote || k == TargetConversation || k == TargetCharacter
 }
 
 // TargetRef names one reportable thing.
@@ -65,13 +67,16 @@ const (
 	ReasonHarassment Reason = "harassment"
 	ReasonHate       Reason = "hate"
 	ReasonSpam       Reason = "spam"
-	ReasonOther      Reason = "other"
+	// ReasonLivingPerson is a character that impersonates a living person.
+	// Readers may pick it for every kind of target.
+	ReasonLivingPerson Reason = "living_person"
+	ReasonOther        Reason = "other"
 )
 
 // Valid reports whether r is one of the reasons readers can pick.
 func (r Reason) Valid() bool {
 	switch r {
-	case ReasonCopyright, ReasonHarassment, ReasonHate, ReasonSpam, ReasonOther:
+	case ReasonCopyright, ReasonHarassment, ReasonHate, ReasonSpam, ReasonLivingPerson, ReasonOther:
 		return true
 	default:
 		return false

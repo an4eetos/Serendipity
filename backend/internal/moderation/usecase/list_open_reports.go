@@ -21,8 +21,12 @@ func NewListOpenReports(
 	reports ports.ReportRepository,
 	quotes quoteports.QuoteModeration,
 	conversations discussionports.ConversationModeration,
+	personas discussionports.PersonaModeration,
 ) *ListOpenReports {
-	return &ListOpenReports{reports: reports, targets: targets{quotes: quotes, conversations: conversations}}
+	return &ListOpenReports{
+		reports: reports,
+		targets: targets{quotes: quotes, conversations: conversations, personas: personas},
+	}
 }
 
 // Execute lists the targets of the oldest domain.MaxListed open reports,

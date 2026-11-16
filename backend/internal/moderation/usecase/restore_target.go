@@ -33,13 +33,14 @@ func NewRestoreTarget(
 	takedowns ports.TakedownRepository,
 	quotes quoteports.QuoteModeration,
 	conversations discussionports.ConversationModeration,
+	personas discussionports.PersonaModeration,
 	wordCap quote.CoverageCap,
 ) *RestoreTarget {
 	return &RestoreTarget{
 		txm:       txm,
 		reports:   reports,
 		takedowns: takedowns,
-		targets:   targets{quotes: quotes, conversations: conversations},
+		targets:   targets{quotes: quotes, conversations: conversations, personas: personas},
 		wordCap:   wordCap,
 	}
 }

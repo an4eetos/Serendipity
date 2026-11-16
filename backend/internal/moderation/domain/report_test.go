@@ -18,6 +18,9 @@ func TestNewReport(t *testing.T) {
 	}{
 		{"quote", quote, ReasonCopyright, "", nil, ""},
 		{"conversation", TargetRef{Kind: TargetConversation, ID: "c1"}, ReasonHarassment, "", nil, ""},
+		{"character depicting a living person", TargetRef{Kind: TargetCharacter, ID: "p1"}, ReasonLivingPerson, "", nil, ""},
+		// D11: the reason is accepted for every kind; the web offers it for characters only.
+		{"living person on a quote", quote, ReasonLivingPerson, "", nil, ""},
 		{"trims the note", quote, ReasonOther, "  see page 3  ", nil, "see page 3"},
 		{"note at the limit, counted in characters", quote, ReasonSpam, strings.Repeat("é", MaxNoteLength), nil, strings.Repeat("é", MaxNoteLength)},
 		{"note too long", quote, ReasonSpam, strings.Repeat("a", MaxNoteLength+1), ErrNoteTooLong, ""},
@@ -47,22 +50,25 @@ func TestNewReport(t *testing.T) {
 }
 
 func TestKindsAndReasons(t *testing.T) {
-	for _, k := range []TargetKind{TargetQuote, TargetConversation} {
+	for _, k := range []TargetKind{TargetQuote, TargetConversation, TargetCharacter} {
 		if !k.Valid() {
 			t.Errorf("%q must be valid", k)
 		}
 	}
-	for _, k := range []TargetKind{"", "Quote", "comment", "character"} {
+	if TargetCharacter != "character" || ReasonLivingPerson != "living_person" {
+		t.Errorf("stored values: kind %q, reason %q", TargetCharacter, ReasonLivingPerson)
+	}
+	for _, k := range []TargetKind{"", "Quote", "comment", "Character", "persona"} {
 		if k.Valid() {
-			t.Errorf("%q must not be valid yet", k)
+			t.Errorf("%q must not be valid", k)
 		}
 	}
-	for _, r := range []Reason{ReasonCopyright, ReasonHarassment, ReasonHate, ReasonSpam, ReasonOther} {
+	for _, r := range []Reason{ReasonCopyright, ReasonHarassment, ReasonHate, ReasonSpam, ReasonLivingPerson, ReasonOther} {
 		if !r.Valid() {
 			t.Errorf("%q must be valid", r)
 		}
 	}
-	for _, r := range []Reason{"", "Copyright", "abuse"} {
+	for _, r := range []Reason{"", "Copyright", "abuse", "living person", "Living_Person"} {
 		if r.Valid() {
 			t.Errorf("%q must not be valid", r)
 		}

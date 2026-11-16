@@ -16,10 +16,12 @@ type Target struct {
 	// Public reports whether anyone can see the target now.
 	Public  bool
 	Removed bool
-	// Quote is the quote, or the conversation's quote.
+	// Quote is the quote, or the conversation's quote; nil for characters.
 	Quote *quote.Quote
-	// Conversation is nil for quotes.
+	// Conversation is nil for quotes and characters.
 	Conversation *discussion.Conversation
+	// Character is set for characters only.
+	Character *discussion.Persona
 }
 
 // QuoteTarget is a quote as reportable content.
@@ -34,16 +36,29 @@ func QuoteTarget(q quote.Quote) Target {
 }
 
 // ConversationTarget is a discussion of q as reportable content. Public pages
-// show a discussion only when its quote is public, it isn't removed and the
-// character has answered.
+// show a discussion only when its quote is public, neither it nor its
+// character is removed, and the character has answered.
 func ConversationTarget(c discussion.Conversation, q quote.Quote) Target {
 	return Target{
 		Ref:          TargetRef{Kind: TargetConversation, ID: c.ID},
 		OwnerID:      c.UserID,
-		Public:       q.IsPublic() && !c.Removed() && c.Answered(),
+		Public:       q.IsPublic() && !c.Removed() && !c.Persona.Removed() && c.Answered(),
 		Removed:      c.Removed(),
 		Quote:        &q,
 		Conversation: &c,
+	}
+}
+
+// CharacterTarget is a reader's own character as reportable content. Readers
+// see it only next to a discussion that public pages show.
+func CharacterTarget(m discussion.ModeratedPersona) Target {
+	p := m.Persona
+	return Target{
+		Ref:       TargetRef{Kind: TargetCharacter, ID: p.ID},
+		OwnerID:   p.OwnerID,
+		Public:    m.InPublicDiscussion && !p.Removed(),
+		Removed:   p.Removed(),
+		Character: &p,
 	}
 }
 

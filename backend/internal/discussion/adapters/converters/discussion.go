@@ -28,11 +28,21 @@ type PersonaResponse struct {
 	Era      string `json:"era"`
 	ShortBio string `json:"short_bio"`
 	IsPreset bool   `json:"is_preset"`
+	// Status is active, archived or removed.
+	Status string `json:"status"`
 }
 
 // ToPersonaResponse leaves out the system prompt, which readers never see.
 func ToPersonaResponse(p domain.Persona) PersonaResponse {
-	return PersonaResponse{ID: p.ID, Slug: p.Slug, Name: p.Name, Era: p.Era, ShortBio: p.ShortBio, IsPreset: p.IsPreset}
+	return PersonaResponse{
+		ID:       p.ID,
+		Slug:     p.Slug,
+		Name:     p.Name,
+		Era:      p.Era,
+		ShortBio: p.ShortBio,
+		IsPreset: p.IsPreset,
+		Status:   string(p.Status()),
+	}
 }
 
 func ToPersonaResponses(ps []domain.Persona) []PersonaResponse {

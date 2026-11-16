@@ -1,6 +1,8 @@
 // Package converters maps moderation HTTP requests and responses to domain
 // values. Reported content is embedded with the quote and discussion
-// contexts' responses, in full: only admins see these.
+// contexts' responses, in full: only admins see these. A reported character
+// is embedded as AdminCharacterResponse, prompt included; it is admin-only
+// and no reader route may use it.
 package converters
 
 import (
@@ -12,7 +14,7 @@ import (
 	quoteconv "github.com/an4eetos/serendipity/backend/internal/quote/adapters/converters"
 )
 
-// TargetRequest names a quote or a discussion.
+// TargetRequest names a quote, a discussion or a character.
 type TargetRequest struct {
 	TargetKind string `json:"target_kind"`
 	TargetID   string `json:"target_id"`
@@ -80,8 +82,8 @@ type ReportEntryResponse struct {
 }
 
 // ReportedTargetResponse is a reported target with its open reports. Quote
-// is the quote, or the conversation's quote; both are null when the content
-// was deleted.
+// is the quote, or the conversation's quote; character is set for characters
+// only. All three are null when the content was deleted.
 type ReportedTargetResponse struct {
 	TargetKind    string                               `json:"target_kind"`
 	TargetID      string                               `json:"target_id"`
@@ -89,6 +91,7 @@ type ReportedTargetResponse struct {
 	OwnerUsername string                               `json:"owner_username"`
 	Quote         *quoteconv.QuoteResponse             `json:"quote"`
 	Conversation  *discussionconv.ConversationResponse `json:"conversation"`
+	Character     *AdminCharacterResponse              `json:"character"`
 	Reports       []ReportEntryResponse                `json:"reports"`
 }
 
@@ -113,7 +116,7 @@ func ToReportedTargetResponses(ts []domain.ReportedTarget) []ReportedTargetRespo
 			OwnerUsername: t.OwnerUsername,
 			Reports:       reports,
 		}
-		out[i].Quote, out[i].Conversation = toContent(t.Content)
+		out[i].Quote, out[i].Conversation, out[i].Character = toContent(t.Content)
 	}
 	return out
 }
@@ -149,11 +152,13 @@ func ToTakedownResponse(t domain.Takedown) TakedownResponse {
 }
 
 // TakedownTargetResponse is an active takedown with the content it hides.
-// Quote and conversation are null when the content was deleted.
+// Quote, conversation and character are null when the content was deleted;
+// character is set for characters only.
 type TakedownTargetResponse struct {
 	TakedownResponse
 	Quote        *quoteconv.QuoteResponse             `json:"quote"`
 	Conversation *discussionconv.ConversationResponse `json:"conversation"`
+	Character    *AdminCharacterResponse              `json:"character"`
 }
 
 // ToTakedownTargetResponses converts active takedowns, with their content, for admins.
@@ -161,7 +166,7 @@ func ToTakedownTargetResponses(vs []domain.TakedownView) []TakedownTargetRespons
 	out := make([]TakedownTargetResponse, len(vs))
 	for i, v := range vs {
 		out[i] = TakedownTargetResponse{TakedownResponse: ToTakedownResponse(v.Takedown)}
-		out[i].Quote, out[i].Conversation = toContent(v.Content)
+		out[i].Quote, out[i].Conversation, out[i].Character = toContent(v.Content)
 	}
 	return out
 }
@@ -171,11 +176,48 @@ type DismissResponse struct {
 	Dismissed int `json:"dismissed"`
 }
 
-// toContent embeds a target's quote and conversation; each is nil when
-// absent.
-func toContent(t *domain.Target) (*quoteconv.QuoteResponse, *discussionconv.ConversationResponse) {
+// AdminCharacterResponse is a reader's character as admins review it, prompt
+// included. Only admin responses embed it; no reader route may use it.
+type AdminCharacterResponse struct {
+	ID            string     `json:"id"`
+	Slug          string     `json:"slug"`
+	Name          string     `json:"name"`
+	Era           string     `json:"era"`
+	ShortBio      string     `json:"short_bio"`
+	Prompt        string     `json:"prompt"`
+	Status        string     `json:"status"`
+	ArchivedAt    *time.Time `json:"archived_at"`
+	RemovedAt     *time.Time `json:"removed_at"`
+	RemovedReason string     `json:"removed_reason"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+// toAdminCharacter converts a character for admins, prompt included.
+func toAdminCharacter(p discussion.Persona) AdminCharacterResponse {
+	return AdminCharacterResponse{
+		ID:            p.ID,
+		Slug:          p.Slug,
+		Name:          p.Name,
+		Era:           p.Era,
+		ShortBio:      p.ShortBio,
+		Prompt:        p.SystemPrompt,
+		Status:        string(p.Status()),
+		ArchivedAt:    p.ArchivedAt,
+		RemovedAt:     p.RemovedAt,
+		RemovedReason: p.RemovedReason,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
+	}
+}
+
+// toContent embeds a target's quote, conversation and character; each is nil
+// when absent. A character's quote and conversation are always nil.
+func toContent(
+	t *domain.Target,
+) (*quoteconv.QuoteResponse, *discussionconv.ConversationResponse, *AdminCharacterResponse) {
 	if t == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	var q *quoteconv.QuoteResponse
 	if t.Quote != nil {
@@ -186,5 +228,10 @@ func toContent(t *domain.Target) (*quoteconv.QuoteResponse, *discussionconv.Conv
 	if t.Conversation != nil {
 		c = &discussionconv.ToConversationResponses([]discussion.Conversation{*t.Conversation})[0]
 	}
-	return q, c
+	var ch *AdminCharacterResponse
+	if t.Character != nil {
+		resp := toAdminCharacter(*t.Character)
+		ch = &resp
+	}
+	return q, c, ch
 }

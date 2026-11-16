@@ -37,6 +37,12 @@ func (uc *PostMessage) Execute(ctx context.Context, userID, conversationID, cont
 	if err != nil {
 		return domain.Message{}, err
 	}
+	if conv.Removed() {
+		return domain.Message{}, domain.ErrConversationRemoved
+	}
+	if err := conv.Persona.CheckUsable(); err != nil {
+		return domain.Message{}, err
+	}
 	if err := conv.CheckReaderTurn(); err != nil {
 		return domain.Message{}, err
 	}

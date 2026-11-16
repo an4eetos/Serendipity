@@ -177,9 +177,19 @@ type messageBody struct {
 	Content string `json:"content"`
 }
 
+type personaBody struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Era      string `json:"era"`
+	ShortBio string `json:"short_bio"`
+	IsPreset bool   `json:"is_preset"`
+	Status   string `json:"status"`
+}
+
 type conversationBody struct {
 	ID            string        `json:"id"`
 	QuoteID       string        `json:"quote_id"`
+	Persona       personaBody   `json:"persona"`
 	Messages      []messageBody `json:"messages"`
 	RemovedAt     *string       `json:"removed_at"`
 	RemovedReason string        `json:"removed_reason"`
@@ -243,14 +253,19 @@ func (p publicProfileBody) book(workID string) *publicBookBody {
 
 // hasConversation reports whether any listed quote shows conversation id.
 func (p publicProfileBody) hasConversation(id string) bool {
-	for _, q := range p.Quotes {
-		for _, c := range q.Conversations {
-			if c.ID == id {
-				return true
+	return p.conversation(id) != nil
+}
+
+// conversation returns the listed conversation with id, or nil.
+func (p publicProfileBody) conversation(id string) *conversationBody {
+	for i := range p.Quotes {
+		for j := range p.Quotes[i].Conversations {
+			if p.Quotes[i].Conversations[j].ID == id {
+				return &p.Quotes[i].Conversations[j]
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 type reportBody struct {
@@ -279,6 +294,51 @@ type takedownBody struct {
 	HiddenBy   *string `json:"hidden_by"`
 	RestoredAt *string `json:"restored_at"`
 	RestoredBy *string `json:"restored_by"`
+}
+
+// characterBody is a character as its owner, or an admin, sees it.
+type characterBody struct {
+	ID            string  `json:"id"`
+	Slug          string  `json:"slug"`
+	Name          string  `json:"name"`
+	Era           string  `json:"era"`
+	ShortBio      string  `json:"short_bio"`
+	Prompt        string  `json:"prompt"`
+	Status        string  `json:"status"`
+	NameLocked    bool    `json:"name_locked"`
+	ArchivedAt    *string `json:"archived_at"`
+	RemovedAt     *string `json:"removed_at"`
+	RemovedReason string  `json:"removed_reason"`
+}
+
+type characterListBody struct {
+	Characters  []characterBody `json:"characters"`
+	Active      int             `json:"active"`
+	ActiveLimit int             `json:"active_limit"`
+}
+
+// character returns the listed character with id, or nil.
+func (l characterListBody) character(id string) *characterBody {
+	for i := range l.Characters {
+		if l.Characters[i].ID == id {
+			return &l.Characters[i]
+		}
+	}
+	return nil
+}
+
+// adminContentBody is a reported or hidden target with the character it
+// embeds, prompt included.
+type adminContentBody struct {
+	ID         string         `json:"id"`
+	TargetKind string         `json:"target_kind"`
+	TargetID   string         `json:"target_id"`
+	OwnerID    string         `json:"owner_id"`
+	Character  *characterBody `json:"character"`
+	Reports    []struct {
+		ReporterID string `json:"reporter_id"`
+		Reason     string `json:"reason"`
+	} `json:"reports"`
 }
 
 type dismissedBody struct {

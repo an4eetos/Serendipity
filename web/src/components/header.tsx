@@ -29,7 +29,7 @@ export function Header() {
 
   return (
     <header className="border-b border-line">
-      <nav className="mx-auto flex max-w-5xl items-center gap-5 px-4 py-3 text-sm">
+      <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:gap-x-5 py-3 text-sm">
         <Link href="/" className="font-serif text-lg font-semibold tracking-tight">
           Serendipity
         </Link>
@@ -38,6 +38,9 @@ export function Header() {
           <>
             <Link href="/library" className="hover:text-accent">
               Library
+            </Link>
+            <Link href="/characters" className="hover:text-accent">
+              Characters
             </Link>
             {me?.username && (
               <Link href={`/u/${me.username}`} className="hover:text-accent">

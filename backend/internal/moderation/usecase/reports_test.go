@@ -82,7 +82,7 @@ func TestCreateReport(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := newWorld()
 			reports := &fakeReports{log: w.log, createErr: tt.createErr}
-			r, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations).
+			r, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations, w.personas).
 				Execute(t.Context(), tt.reporter, tt.ref, tt.reason, " a note ")
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
@@ -106,7 +106,7 @@ func TestCreateReportStoresTheTargetsOwnID(t *testing.T) {
 	// The database matches a uuid however it is spelled.
 	w.quotes.byID["Q-PUBLIC"] = w.quotes.byID["q-public"]
 	reports := &fakeReports{log: w.log}
-	_, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations).
+	_, err := NewCreateReport(&portstest.TxManager{}, reports, w.profiles, w.quotes, w.conversations, w.personas).
 		Execute(t.Context(), "bo", domain.TargetRef{Kind: domain.TargetQuote, ID: "Q-PUBLIC"}, domain.ReasonSpam, "")
 	if err != nil || reports.created[0].Target.ID != "q-public" {
 		t.Errorf("stored %#v, %v; want the quote's own id, so reports on it group together", reports.created, err)
@@ -147,7 +147,7 @@ func TestListOpenReports(t *testing.T) {
 		{ID: "r4", Target: q("q-deleted"), OwnerID: "ada"},
 		{ID: "r5", Target: c("c-on-removed"), OwnerID: "ada"},
 	}}
-	got, err := NewListOpenReports(reports, w.quotes, w.conversations).Execute(t.Context())
+	got, err := NewListOpenReports(reports, w.quotes, w.conversations, w.personas).Execute(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestListOpenReports(t *testing.T) {
 	}
 
 	w = newWorld()
-	if got, err := NewListOpenReports(&fakeReports{log: w.log}, w.quotes, w.conversations).Execute(t.Context()); err != nil || len(got) != 0 ||
+	if got, err := NewListOpenReports(&fakeReports{log: w.log}, w.quotes, w.conversations, w.personas).Execute(t.Context()); err != nil || len(got) != 0 ||
 		!reflect.DeepEqual(w.log.calls, []string{"reports.ListOpen"}) {
 		t.Errorf("no reports: %v, %v, calls %q; want no content lookups", got, err, w.log.calls)
 	}

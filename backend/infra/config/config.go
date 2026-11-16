@@ -14,22 +14,27 @@ const (
 	defaultAddr          = ":8787"
 	defaultTermsVersion  = "draft-2026-10"
 	defaultPublicWordCap = 2500
+	// defaultCustomCharacterLimit is how many active characters a reader may
+	// have when CUSTOM_CHARACTER_LIMIT is unset.
+	defaultCustomCharacterLimit = 20
 	// maxTermsVersionLength is the limit of profiles.terms_version.
 	maxTermsVersionLength = 64
 )
 
 var (
-	errTermsVersion  = errors.New("TERMS_VERSION must be 1 to 64 characters")
-	errPublicWordCap = errors.New("PUBLIC_WORD_CAP must be a positive whole number")
+	errTermsVersion         = errors.New("TERMS_VERSION must be 1 to 64 characters")
+	errPublicWordCap        = errors.New("PUBLIC_WORD_CAP must be a positive whole number")
+	errCustomCharacterLimit = errors.New("CUSTOM_CHARACTER_LIMIT must be a positive whole number")
 )
 
 type Config struct {
-	HTTP      HTTP
-	Database  Database
-	Supabase  Supabase
-	Anthropic Anthropic
-	Terms     Terms
-	Coverage  Coverage
+	HTTP       HTTP
+	Database   Database
+	Supabase   Supabase
+	Anthropic  Anthropic
+	Terms      Terms
+	Coverage   Coverage
+	Characters Characters
 }
 
 type HTTP struct {
@@ -69,6 +74,13 @@ type Coverage struct {
 	PublicWordCap int
 }
 
+// Characters limits readers' own characters.
+type Characters struct {
+	// ActiveLimit is how many characters a reader may have that are neither
+	// archived nor removed.
+	ActiveLimit int
+}
+
 // Load reads the configuration from the environment.
 func Load() (Config, error) {
 	c := Config{
@@ -97,6 +109,11 @@ func Load() (Config, error) {
 		return c, err
 	}
 	c.Coverage = Coverage{PublicWordCap: wordCap}
+	characterLimit, err := customCharacterLimit(os.Getenv("CUSTOM_CHARACTER_LIMIT"))
+	if err != nil {
+		return c, err
+	}
+	c.Characters = Characters{ActiveLimit: characterLimit}
 	var missing []string
 	for _, v := range []struct{ name, value string }{
 		{"DATABASE_URL", c.Database.URL},
@@ -148,6 +165,20 @@ func publicWordCap(raw string) (int, error) {
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 1 {
 		return 0, errPublicWordCap
+	}
+	return n, nil
+}
+
+// customCharacterLimit parses CUSTOM_CHARACTER_LIMIT like publicWordCap:
+// unset means the default, anything else must be a whole number of at
+// least 1.
+func customCharacterLimit(raw string) (int, error) {
+	if raw == "" {
+		return defaultCustomCharacterLimit, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, errCustomCharacterLimit
 	}
 	return n, nil
 }

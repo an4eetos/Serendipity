@@ -76,6 +76,8 @@ export type Quote = {
   work?: Work;
 };
 
+export type PersonaStatus = "active" | "archived" | "removed";
+
 export type Persona = {
   id: string;
   slug: string;
@@ -83,7 +85,33 @@ export type Persona = {
   era: string;
   short_bio: string;
   is_preset: boolean;
+  status: PersonaStatus;
 };
+
+// Character is a reader's own character as its owner sees it (GET /characters).
+// It carries the prompt, so it never appears in anything another reader gets.
+export type Character = {
+  id: string;
+  slug: string;
+  name: string;
+  era: string;
+  short_bio: string;
+  prompt: string;
+  status: PersonaStatus;
+  name_locked: boolean;
+  archived_at: string | null;
+  removed_at: string | null;
+  removed_reason: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CharacterList = { characters: Character[]; active: number; active_limit: number };
+
+export type CharacterInput = { name: string; era: string; short_bio: string; prompt: string };
+
+// AdminCharacter is a character as admins review it, prompt included.
+export type AdminCharacter = Omit<Character, "name_locked">;
 
 export type Message = {
   id: number;
@@ -121,8 +149,8 @@ export type PublicProfile = {
   quotes: QuoteWithConversations[];
 };
 
-export type ReportTargetKind = "quote" | "conversation";
-export type ReportReason = "copyright" | "harassment" | "hate" | "spam" | "other";
+export type ReportTargetKind = "quote" | "conversation" | "character";
+export type ReportReason = "copyright" | "harassment" | "hate" | "spam" | "living_person" | "other";
 export type ReportStatus = "open" | "actioned" | "dismissed";
 
 export const reportReasonLabels: Record<ReportReason, string> = {
@@ -130,6 +158,7 @@ export const reportReasonLabels: Record<ReportReason, string> = {
   harassment: "Harassment",
   hate: "Hate speech",
   spam: "Spam",
+  living_person: "Depicts a living person",
   other: "Something else",
 };
 
@@ -152,6 +181,7 @@ export type ReportedTarget = {
   owner_username: string;
   quote: Quote | null;
   conversation: Conversation | null;
+  character: AdminCharacter | null;
   reports: ReportEntry[];
 };
 
@@ -168,7 +198,11 @@ export type Takedown = {
   restored_by: string | null;
 };
 
-export type TakedownWithTarget = Takedown & { quote: Quote | null; conversation: Conversation | null };
+export type TakedownWithTarget = Takedown & {
+  quote: Quote | null;
+  conversation: Conversation | null;
+  character: AdminCharacter | null;
+};
 
 export type KindleImportResult = {
   books: number;

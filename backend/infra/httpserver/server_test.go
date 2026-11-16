@@ -118,6 +118,7 @@ func newTestRouter() http.Handler {
 			libraryhandlers.New(nil, nil, nil, nil, nil),
 			quotehandlers.New(nil, nil, nil, nil),
 			discussionhandlers.New(nil, nil, nil, nil),
+			discussionhandlers.NewCharacters(nil, nil, nil, nil, nil),
 			kindlehandlers.New(nil),
 			profileRoutes,
 			moderationhandlers.New(nil, nil, nil, nil, nil, nil),
@@ -179,15 +180,36 @@ func TestRouterGatesEveryWriteOnTheTerms(t *testing.T) {
 			}
 		})
 	}
-	// Every write that existed before Phase 1, plus reports, is behind the gate.
+	// Every write that existed before Phase 1, plus reports and Phase 2's
+	// character writes, is behind the gate.
 	for _, want := range []route{
 		{"PATCH", "/me"}, {"POST", "/library"}, {"PATCH", "/library/{id}"}, {"POST", "/imports/kindle"},
 		{"POST", "/quotes"}, {"PATCH", "/quotes/{id}"}, {"DELETE", "/quotes/{id}"},
 		{"POST", "/conversations"}, {"POST", "/conversations/{id}/messages"}, {"POST", "/reports"},
+		{"POST", "/characters"}, {"PATCH", "/characters/{id}"},
+		{"POST", "/characters/{id}/archive"}, {"POST", "/characters/{id}/unarchive"},
 	} {
 		if !slices.Contains(gated, want) {
 			t.Errorf("%s %s is not mounted behind the terms gate", want.method, want.pattern)
 		}
+	}
+}
+
+// GET /characters returns the owner's prompts: it needs a signed-in reader
+// and is never public.
+func TestRouterCharactersArePrivate(t *testing.T) {
+	h := newTestRouter()
+	var found bool
+	for _, rt := range routes(t, h) {
+		if rt.method == http.MethodGet && rt.pattern == "/characters" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("GET /characters is not mounted")
+	}
+	if w := send(h, http.MethodGet, "/characters", "", ""); w.Code != http.StatusUnauthorized {
+		t.Errorf("GET /characters signed out: %d, want 401", w.Code)
 	}
 }
 

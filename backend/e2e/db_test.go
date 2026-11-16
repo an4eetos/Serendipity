@@ -14,7 +14,7 @@ import (
 // baseline after cleanup, in the column order of countRowsSQL.
 var countedTables = []string{
 	"auth.users", "profiles", "works", "library_items", "quotes", "conversations",
-	"messages", "reports", "takedowns", "admins", "storage.objects",
+	"messages", "reports", "takedowns", "admins", "storage.objects", "personas",
 }
 
 const countRowsSQL = `
@@ -28,7 +28,8 @@ const countRowsSQL = `
 	       (select count(*) from public.reports),
 	       (select count(*) from public.takedowns),
 	       (select count(*) from public.admins),
-	       (select count(*) from storage.objects)`
+	       (select count(*) from storage.objects),
+	       (select count(*) from public.personas)`
 
 // rowCounts maps a table name to its row count.
 type rowCounts map[string]int64
@@ -71,12 +72,23 @@ func makeAdmin(ctx context.Context, db *pgxpool.Pool, userID string) error {
 // Socrates preset, with a reader message and a character reply, and returns
 // its id. The API can only create one by calling Anthropic.
 func insertAnsweredConversation(ctx context.Context, db *pgxpool.Pool, userID, quoteID string) (string, error) {
+	var socrates string
+	err := db.QueryRow(ctx, `select id from public.personas where slug = 'socrates' and is_preset`).Scan(&socrates)
+	if err != nil {
+		return "", fmt.Errorf("find the Socrates preset: %w", err)
+	}
+	return insertAnsweredConversationWith(ctx, db, userID, quoteID, socrates)
+}
+
+// insertAnsweredConversationWith is insertAnsweredConversation with
+// personaID, a preset or the reader's own character. The insert triggers
+// still check that the character is usable.
+func insertAnsweredConversationWith(ctx context.Context, db *pgxpool.Pool, userID, quoteID, personaID string) (string, error) {
 	var id string
 	err := pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
 			insert into public.conversations (user_id, quote_id, persona_id)
-			select $1, $2, p.id from public.personas p where p.slug = 'socrates' and p.is_preset
-			returning id`, userID, quoteID).Scan(&id)
+			values ($1, $2, $3) returning id`, userID, quoteID, personaID).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("insert conversation: %w", err)
 		}
@@ -87,6 +99,13 @@ func insertAnsweredConversation(ctx context.Context, db *pgxpool.Pool, userID, q
 		return err
 	})
 	return id, err
+}
+
+// messageCount counts a discussion's stored messages.
+func messageCount(ctx context.Context, db *pgxpool.Pool, conversationID string) (int, error) {
+	var n int
+	err := db.QueryRow(ctx, `select count(*) from public.messages where conversation_id = $1`, conversationID).Scan(&n)
+	return n, err
 }
 
 // deleteReport removes one report row. It undoes a report the API should

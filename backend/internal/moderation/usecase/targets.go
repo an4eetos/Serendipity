@@ -17,6 +17,7 @@ import (
 type targets struct {
 	quotes        quoteports.QuoteModeration
 	conversations discussionports.ConversationModeration
+	personas      discussionports.PersonaModeration
 }
 
 // load returns the target ref names, or kernel.ErrNotFound when it doesn't
@@ -48,26 +49,48 @@ func (t targets) load(ctx context.Context, ref domain.TargetRef) (domain.Target,
 			return domain.Target{}, kernel.ErrNotFound
 		}
 		return domain.ConversationTarget(cs[0], qs[0]), nil
+	case domain.TargetCharacter:
+		ms, err := t.personas.ListAny(ctx, []string{ref.ID})
+		if err != nil {
+			return domain.Target{}, err
+		}
+		if len(ms) == 0 {
+			return domain.Target{}, kernel.ErrNotFound
+		}
+		return domain.CharacterTarget(ms[0]), nil
 	default:
 		return domain.Target{}, domain.ErrInvalidTarget
 	}
 }
 
 // loadAll returns the targets refs name that still exist, by ref. It reads
-// each context at most once: one ConversationModeration.ListAny, then one
-// QuoteModeration.ListAny for the quote refs plus the conversations' quotes.
-// Refs of other kinds are left out.
+// each port at most once: one PersonaModeration.ListAny for the character
+// refs, one ConversationModeration.ListAny, then one QuoteModeration.ListAny
+// for the quote refs plus the conversations' quotes. Refs of other kinds are
+// left out.
 func (t targets) loadAll(ctx context.Context, refs []domain.TargetRef) (map[domain.TargetRef]domain.Target, error) {
 	out := make(map[domain.TargetRef]domain.Target, len(refs))
-	var quoteIDs, conversationIDs []string
+	var quoteIDs, conversationIDs, characterIDs []string
 	for _, ref := range refs {
 		switch ref.Kind {
 		case domain.TargetQuote:
 			quoteIDs = append(quoteIDs, ref.ID)
 		case domain.TargetConversation:
 			conversationIDs = append(conversationIDs, ref.ID)
+		case domain.TargetCharacter:
+			characterIDs = append(characterIDs, ref.ID)
 		default:
 			// A kind this version can't show is listed without content.
+		}
+	}
+
+	if len(characterIDs) > 0 {
+		ms, err := t.personas.ListAny(ctx, unique(characterIDs))
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			out[domain.TargetRef{Kind: domain.TargetCharacter, ID: m.Persona.ID}] = domain.CharacterTarget(m)
 		}
 	}
 
@@ -114,6 +137,8 @@ func (t targets) remove(ctx context.Context, ref domain.TargetRef, reason string
 		return t.quotes.Remove(ctx, ref.ID, reason)
 	case domain.TargetConversation:
 		return t.conversations.Remove(ctx, ref.ID, reason)
+	case domain.TargetCharacter:
+		return t.personas.Remove(ctx, ref.ID, reason)
 	default:
 		return domain.ErrInvalidTarget
 	}
@@ -121,13 +146,17 @@ func (t targets) remove(ctx context.Context, ref domain.TargetRef, reason string
 
 // restore puts the target back in public reads. A restored quote counts
 // toward its work's coverage again, so it is checked against wordCap;
-// conversations don't count. It must run inside the TxManager.
+// conversations and characters don't count, and a restored character
+// ignores its owner's cap of active characters (D7). It must run inside the
+// TxManager.
 func (t targets) restore(ctx context.Context, ref domain.TargetRef, wordCap quote.CoverageCap) error {
 	switch ref.Kind {
 	case domain.TargetQuote:
 		return t.quotes.Restore(ctx, ref.ID, wordCap)
 	case domain.TargetConversation:
 		return t.conversations.Restore(ctx, ref.ID)
+	case domain.TargetCharacter:
+		return t.personas.Restore(ctx, ref.ID)
 	default:
 		return domain.ErrInvalidTarget
 	}

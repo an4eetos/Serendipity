@@ -79,6 +79,10 @@ Besides the Supabase and Anthropic settings, the API reads:
   distinct words of one work may be public across all readers. Past it, a
   newly published passage is collapsed. Override it for one work with
   `update public.works set public_word_cap = <n> where id = '<work uuid>';`.
+- `CUSTOM_CHARACTER_LIMIT` (default `20`, a whole number of at least 1): how
+  many active characters one reader may have. Archived and removed characters
+  don't count. Creating or unarchiving one past the limit fails with 409; an
+  admin restoring a removed character may exceed it.
 
 Admins are listed in the `admins` table. Add the first one in the SQL editor:
 
@@ -104,7 +108,8 @@ cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/p
 ```
 
 The API end-to-end scenario (terms, ownership, storage, coverage cap, public
-profile, reports, admin takedown and restore) builds and starts the real API
+profile, custom characters, reports, admin takedown and restore of quotes,
+discussions and characters) builds and starts the real API
 against the local stack, signs in three throwaway users and deletes everything
 it created. It refuses to run against anything but localhost:
 
@@ -136,11 +141,15 @@ admins only (otherwise 403).
 | POST | `/imports/kindle` | Multipart `file` = My Clippings.txt, plus `ownership_confirmed=true` |
 | GET/POST | `/quotes` | List (optionally `?work_id=`) / create (with optional `reaction`) |
 | GET/PATCH/DELETE | `/quotes/{id}` | Quote + discussions; edit reaction, visibility |
-| GET | `/personas` | Characters |
+| GET | `/personas` | Characters for the picker: presets + your active characters |
+| GET/POST | `/characters` | Your own characters (with their prompts) / create one (409 past `CUSTOM_CHARACTER_LIMIT`) |
+| PATCH | `/characters/{id}` | Edit your character; the name is locked once it has been in a discussion (409) |
+| POST | `/characters/{id}/archive` | Archive your character: it leaves the picker and its discussions become read-only |
+| POST | `/characters/{id}/unarchive` | Unarchive your character (409 past `CUSTOM_CHARACTER_LIMIT`) |
 | POST | `/conversations` | Discuss a quote's reaction with a character (needs a reaction); streams SSE |
 | POST | `/conversations/{id}/messages` | Reply; streams SSE |
-| POST | `/reports` | Report a public quote or discussion |
+| POST | `/reports` | Report a public quote, discussion or character |
 | GET | `/admin/reports` | Admin: open reports, grouped by target |
 | POST | `/admin/reports/dismiss` | Admin: dismiss a target's open reports |
-| GET/POST | `/admin/takedowns` | Admin: active takedowns / hide a quote or discussion |
+| GET/POST | `/admin/takedowns` | Admin: active takedowns / hide a quote, discussion or character |
 | POST | `/admin/takedowns/{id}/restore` | Admin: restore hidden content |

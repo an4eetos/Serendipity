@@ -26,12 +26,13 @@ func NewHideTarget(
 	takedowns ports.TakedownRepository,
 	quotes quoteports.QuoteModeration,
 	conversations discussionports.ConversationModeration,
+	personas discussionports.PersonaModeration,
 ) *HideTarget {
 	return &HideTarget{
 		txm:       txm,
 		reports:   reports,
 		takedowns: takedowns,
-		targets:   targets{quotes: quotes, conversations: conversations},
+		targets:   targets{quotes: quotes, conversations: conversations, personas: personas},
 	}
 }
 

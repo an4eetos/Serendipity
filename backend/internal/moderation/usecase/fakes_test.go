@@ -105,6 +105,46 @@ func (f *fakeConversations) Restore(ctx context.Context, id string) error {
 	return nil
 }
 
+// fakePersonas implements discussionports.PersonaModeration on a map of
+// custom characters.
+type fakePersonas struct {
+	log  *recorder
+	byID map[string]discussion.ModeratedPersona
+}
+
+func (f *fakePersonas) ListAny(ctx context.Context, ids []string) ([]discussion.ModeratedPersona, error) {
+	f.log.add(ctx, "personas.ListAny %v", ids)
+	out := []discussion.ModeratedPersona{}
+	for _, id := range ids {
+		if m, ok := f.byID[id]; ok {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakePersonas) Remove(ctx context.Context, id, reason string) error {
+	f.log.add(ctx, "personas.Remove %s %q", id, reason)
+	m, ok := f.byID[id]
+	if !ok || m.Persona.Removed() {
+		return kernel.ErrNotFound
+	}
+	m.Persona.RemovedAt, m.Persona.RemovedReason = &at, reason
+	f.byID[id] = m
+	return nil
+}
+
+func (f *fakePersonas) Restore(ctx context.Context, id string) error {
+	f.log.add(ctx, "personas.Restore %s", id)
+	m, ok := f.byID[id]
+	if !ok || !m.Persona.Removed() {
+		return kernel.ErrNotFound
+	}
+	m.Persona.RemovedAt, m.Persona.RemovedReason = nil, ""
+	f.byID[id] = m
+	return nil
+}
+
 type fakeReports struct {
 	log       *recorder
 	open      []domain.Report
@@ -201,12 +241,20 @@ func (f *fakeAdmins) IsAdmin(_ context.Context, userID string) (bool, error) {
 //   - "q-private": ada's private quote;
 //   - "q-removed": ada's public quote, removed by a moderator, discussed in
 //     "c-on-removed";
-//   - "c-removed": a removed discussion of "q-public".
+//   - "c-removed": a removed discussion of "q-public";
+//   - "c-removed-character": an answered discussion of "q-public" whose
+//     character "ch-removed" a moderator removed;
+//   - "ch-public": ada's character, in a discussion public pages show;
+//   - "ch-unseen": ada's character, in no discussion public pages show;
+//   - "ch-archived": ada's archived character, still in a public discussion;
+//   - "ch-removed": ada's character, removed by a moderator;
+//   - "ch-on-private-profile": cy's character, in a public discussion.
 type world struct {
 	log           *recorder
 	profiles      *fakeProfiles
 	quotes        *fakeQuotes
 	conversations *fakeConversations
+	personas      *fakePersonas
 }
 
 // fakeProfiles implements ports.ProfileVisibility on a set of public profiles.
@@ -239,6 +287,33 @@ func newWorld() world {
 			"c-silent":     {ID: "c-silent", UserID: "ada", QuoteID: "q-public", Messages: []discussion.Message{}},
 			"c-on-removed": {ID: "c-on-removed", UserID: "ada", QuoteID: "q-removed", Messages: answered},
 			"c-removed":    {ID: "c-removed", UserID: "ada", QuoteID: "q-public", Messages: answered, RemovedAt: &at, RemovedReason: "spam"},
+			"c-removed-character": {ID: "c-removed-character", UserID: "ada", QuoteID: "q-public", Messages: answered,
+				Persona: removedCharacter},
+		}},
+		personas: &fakePersonas{log: log, byID: map[string]discussion.ModeratedPersona{
+			"ch-public":             {Persona: character("ch-public", "ada"), InPublicDiscussion: true},
+			"ch-unseen":             {Persona: character("ch-unseen", "ada")},
+			"ch-archived":           {Persona: archivedCharacter, InPublicDiscussion: true},
+			"ch-removed":            {Persona: removedCharacter, InPublicDiscussion: true},
+			"ch-on-private-profile": {Persona: character("ch-on-private-profile", "cy"), InPublicDiscussion: true},
 		}},
 	}
 }
+
+// character is a reader's own character with a prompt only moderators see.
+func character(id, owner string) discussion.Persona {
+	return discussion.Persona{ID: id, OwnerID: owner, Name: "Character " + id, SystemPrompt: "Prompt of " + id}
+}
+
+var (
+	archivedCharacter = func() discussion.Persona {
+		p := character("ch-archived", "ada")
+		p.ArchivedAt = &at
+		return p
+	}()
+	removedCharacter = func() discussion.Persona {
+		p := character("ch-removed", "ada")
+		p.RemovedAt, p.RemovedReason = &at, "living person"
+		return p
+	}()
+)

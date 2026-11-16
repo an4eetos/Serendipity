@@ -21,8 +21,12 @@ func NewListTakedowns(
 	takedowns ports.TakedownRepository,
 	quotes quoteports.QuoteModeration,
 	conversations discussionports.ConversationModeration,
+	personas discussionports.PersonaModeration,
 ) *ListTakedowns {
-	return &ListTakedowns{takedowns: takedowns, targets: targets{quotes: quotes, conversations: conversations}}
+	return &ListTakedowns{
+		takedowns: takedowns,
+		targets:   targets{quotes: quotes, conversations: conversations, personas: personas},
+	}
 }
 
 // Execute lists the newest domain.MaxListed active takedowns.

@@ -96,8 +96,16 @@ func TestConversationRepository(t *testing.T) {
 			t.Errorf("ListForQuote() after deleting the answer = %#v, %v", forQuote, err)
 		}
 
+		// Both discussions were created in this one transaction, so they
+		// share created_at and their order is not defined: find them by id.
 		both, err := repo.ListForQuotes(ctx, uid, []string{q1.ID, q2.ID})
-		if err != nil || len(both) != 2 || both[1].ID != unanswered || both[1].Messages == nil || len(both[1].Messages) != 0 {
+		var silent *domain.Conversation
+		for i := range both {
+			if both[i].ID == unanswered {
+				silent = &both[i]
+			}
+		}
+		if err != nil || len(both) != 2 || silent == nil || silent.Messages == nil || len(silent.Messages) != 0 {
 			t.Errorf("ListForQuotes() = %#v, %v", both, err)
 		}
 		if none, err := repo.ListForQuotes(ctx, other, []string{q1.ID}); err != nil || none == nil || len(none) != 0 {

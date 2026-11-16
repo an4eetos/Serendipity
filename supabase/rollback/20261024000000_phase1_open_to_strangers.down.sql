@@ -3,6 +3,9 @@
 --   20261115000000_name_removed_quote_guard.sql
 -- and returns the schema to 20261008000000_init.sql.
 --
+-- Roll Phase 2 back first: this script refuses to run while
+-- supabase/rollback/20261116000000_phase2_custom_characters.down.sql hasn't.
+--
 -- This is NOT a migration: the Supabase CLI never runs it. Run it by hand,
 -- only after redeploying the Phase 0 API and web (they don't know the
 -- moderation tables or the terms gate), and only after a backup:
@@ -22,6 +25,16 @@
 -- Everything runs in one transaction: on any error nothing changes.
 
 begin;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'personas' and column_name = 'archived_at'
+  ) then
+    raise exception 'Phase 2 is applied: run supabase/rollback/20261116000000_phase2_custom_characters.down.sql first';
+  end if;
+end $$;
 
 do $$
 begin

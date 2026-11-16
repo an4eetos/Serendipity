@@ -11,7 +11,7 @@ import (
 )
 
 // CreateReport lets a signed-in reader ask admins to look at someone else's
-// public quote or discussion.
+// public quote, discussion or character.
 type CreateReport struct {
 	txm      kernelports.TxManager
 	reports  ports.ReportRepository
@@ -26,10 +26,11 @@ func NewCreateReport(
 	profiles ports.ProfileVisibility,
 	quotes quoteports.QuoteModeration,
 	conversations discussionports.ConversationModeration,
+	personas discussionports.PersonaModeration,
 ) *CreateReport {
 	return &CreateReport{
 		txm: txm, reports: reports, profiles: profiles,
-		targets: targets{quotes: quotes, conversations: conversations},
+		targets: targets{quotes: quotes, conversations: conversations, personas: personas},
 	}
 }
 

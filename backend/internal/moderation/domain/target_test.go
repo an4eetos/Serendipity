@@ -52,6 +52,12 @@ func TestConversationTarget(t *testing.T) {
 		{"on a private quote", discussion.Conversation{ID: "c1", UserID: "owner", Messages: answered}, private, false, false},
 		{"on a removed quote", discussion.Conversation{ID: "c1", UserID: "owner", Messages: answered}, removedQuote, false, false},
 		{"removed itself", discussion.Conversation{ID: "c1", UserID: "owner", Messages: answered, RemovedAt: &removedAt}, public, false, true},
+		// P3: a discussion with a removed character leaves public pages, so
+		// readers can't report it; the discussion itself isn't removed.
+		{"its character removed", discussion.Conversation{ID: "c1", UserID: "owner", Messages: answered,
+			Persona: discussion.Persona{ID: "p1", RemovedAt: &removedAt}}, public, false, false},
+		{"its character archived stays public", discussion.Conversation{ID: "c1", UserID: "owner", Messages: answered,
+			Persona: discussion.Persona{ID: "p1", ArchivedAt: &removedAt}}, public, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,6 +69,47 @@ func TestConversationTarget(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCharacterTarget(t *testing.T) {
+	character := discussion.Persona{ID: "p1", OwnerID: "owner", Name: "Ada", SystemPrompt: "You are Ada."}
+	archived := character
+	archived.ArchivedAt = &removedAt
+	removed := character
+	removed.RemovedAt, removed.RemovedReason = &removedAt, "living person"
+	tests := []struct {
+		name                    string
+		m                       discussion.ModeratedPersona
+		wantPublic, wantRemoved bool
+	}{
+		{"in a public discussion", discussion.ModeratedPersona{Persona: character, InPublicDiscussion: true}, true, false},
+		{"in no public discussion", discussion.ModeratedPersona{Persona: character}, false, false},
+		{"archived, still in a public discussion", discussion.ModeratedPersona{Persona: archived, InPublicDiscussion: true}, true, false},
+		{"removed", discussion.ModeratedPersona{Persona: removed, InPublicDiscussion: true}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CharacterTarget(tt.m)
+			if got.Ref != (TargetRef{Kind: TargetCharacter, ID: "p1"}) || got.OwnerID != "owner" ||
+				got.Public != tt.wantPublic || got.Removed != tt.wantRemoved ||
+				got.Quote != nil || got.Conversation != nil || got.Character == nil ||
+				got.Character.ID != "p1" || got.Character.SystemPrompt != "You are Ada." {
+				t.Errorf("CharacterTarget() = %#v", got)
+			}
+		})
+	}
+	t.Run("on a private profile it is not reportable", func(t *testing.T) {
+		got := CharacterTarget(discussion.ModeratedPersona{Persona: character, InPublicDiscussion: true}).OnProfile(false)
+		if err := got.CheckReportable("reader"); !errors.Is(err, kernel.ErrNotFound) {
+			t.Errorf("CheckReportable() = %v, want kernel.ErrNotFound", err)
+		}
+	})
+	t.Run("its owner can't report it", func(t *testing.T) {
+		got := CharacterTarget(discussion.ModeratedPersona{Persona: character, InPublicDiscussion: true}).OnProfile(true)
+		if err := got.CheckReportable("owner"); !errors.Is(err, ErrOwnContent) {
+			t.Errorf("CheckReportable() = %v, want ErrOwnContent", err)
+		}
+	})
 }
 
 func TestCheckReportable(t *testing.T) {

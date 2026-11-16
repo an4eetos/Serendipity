@@ -117,6 +117,15 @@ export function ProfileView({ data, preview = false }: { data: PublicProfile; pr
                     <span className="text-muted"> · {c.messages.length} message{c.messages.length === 1 ? "" : "s"}</span>
                   </summary>
                   <div className="mt-3 space-y-3">
+                    {(c.persona.era || c.persona.short_bio) && (
+                      <div className="text-xs text-muted">
+                        {c.persona.era && <p>{c.persona.era}</p>}
+                        {c.persona.short_bio && <p className="break-words">{c.persona.short_bio}</p>}
+                      </div>
+                    )}
+                    {!c.persona.is_preset && (
+                      <ReportButton targetKind="character" targetId={c.persona.id} ownerId={profile.id} />
+                    )}
                     {c.messages.map((m) => (
                       <div key={m.id}>
                         <p className="text-xs font-medium text-muted">

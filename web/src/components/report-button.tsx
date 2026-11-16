@@ -8,6 +8,17 @@ import { useViewerId } from "./viewer";
 const MAX_NOTE = 1000;
 const reasons = Object.keys(reportReasonLabels) as ReportReason[];
 
+const kindNouns: Record<ReportTargetKind, string> = {
+  quote: "quote",
+  conversation: "discussion",
+  character: "character",
+};
+
+// reasonsFor offers "Depicts a living person" only on character reports.
+function reasonsFor(kind: ReportTargetKind): ReportReason[] {
+  return kind === "character" ? reasons : reasons.filter((r) => r !== "living_person");
+}
+
 type Props = {
   targetKind: ReportTargetKind;
   targetId: string;
@@ -15,7 +26,7 @@ type Props = {
   ownerId: string;
 };
 
-// ReportButton lets a signed-in reader flag a public quote or discussion for
+// ReportButton lets a signed-in reader flag a public quote, discussion or character for
 // moderators. It renders nothing for signed-out viewers and for the owner.
 // It must be rendered inside a ViewerProvider, which holds the session.
 export function ReportButton({ targetKind, targetId, ownerId }: Props) {
@@ -49,17 +60,20 @@ export function ReportButton({ targetKind, targetId, ownerId }: Props) {
 
   if (!open) {
     return (
-      <button type="button" className="text-xs text-muted hover:text-danger" onClick={() => setOpen(true)}>
-        Report
+      <button
+        type="button"
+        className="text-xs text-muted hover:text-danger"
+        aria-label={`Report this ${kindNouns[targetKind]}`}
+        onClick={() => setOpen(true)}
+      >
+        Report {kindNouns[targetKind]}
       </button>
     );
   }
 
   return (
     <form onSubmit={submit} className="space-y-2 rounded-md border border-line p-3">
-      <p className="text-sm font-medium">
-        Report this {targetKind === "conversation" ? "discussion" : "quote"}
-      </p>
+      <p className="text-sm font-medium">Report this {kindNouns[targetKind]}</p>
       <label htmlFor={`${id}-reason`} className="block text-xs text-muted">
         Reason
       </label>
@@ -73,7 +87,7 @@ export function ReportButton({ targetKind, targetId, ownerId }: Props) {
         <option value="" disabled>
           Choose a reason
         </option>
-        {reasons.map((r) => (
+        {reasonsFor(targetKind).map((r) => (
           <option key={r} value={r}>
             {reportReasonLabels[r]}
           </option>

@@ -53,7 +53,7 @@ func TestHideTarget(t *testing.T) {
 			w := newWorld()
 			txm := &portstest.TxManager{}
 			takedowns := &fakeTakedowns{log: w.log, createErr: tt.createErr}
-			td, err := NewHideTarget(txm, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations).
+			td, err := NewHideTarget(txm, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations, w.personas).
 				Execute(t.Context(), "root", tt.ref, tt.reason)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
@@ -129,7 +129,7 @@ func TestRestoreTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w, takedowns := restoreWorld()
 			txm := &portstest.TxManager{}
-			td, err := NewRestoreTarget(txm, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations, wordCap).
+			td, err := NewRestoreTarget(txm, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations, w.personas, wordCap).
 				Execute(t.Context(), "root", tt.takedown)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tt.wantErr)
@@ -151,7 +151,7 @@ func TestRestoreTarget(t *testing.T) {
 
 	t.Run("the restored quote is public again", func(t *testing.T) {
 		w, takedowns := restoreWorld()
-		_, err := NewRestoreTarget(&portstest.TxManager{}, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations, wordCap).
+		_, err := NewRestoreTarget(&portstest.TxManager{}, &fakeReports{log: w.log}, takedowns, w.quotes, w.conversations, w.personas, wordCap).
 			Execute(t.Context(), "root", "td-quote")
 		if q := w.quotes.byID["q-removed"]; err != nil || !q.IsPublic() || q.RemovedReason != "" {
 			t.Errorf("quote after restore = %#v, %v", q, err)
@@ -171,7 +171,7 @@ func TestRestoreTargetLookupFailure(t *testing.T) {
 	w, takedowns := restoreWorld()
 	errDB := errors.New("connection reset")
 	txm := &portstest.TxManager{}
-	_, err := NewRestoreTarget(txm, &fakeReports{log: w.log}, takedowns, failingQuotes{w.quotes, errDB}, w.conversations, 10).
+	_, err := NewRestoreTarget(txm, &fakeReports{log: w.log}, takedowns, failingQuotes{w.quotes, errDB}, w.conversations, w.personas, 10).
 		Execute(t.Context(), "root", "td-quote")
 	// A failed lookup must not be taken for a deleted target: that would
 	// close the takedown without restoring anything.
@@ -187,7 +187,7 @@ func TestListTakedowns(t *testing.T) {
 		{ID: "td2", Target: domain.TargetRef{Kind: domain.TargetConversation, ID: "c-removed"}},
 		{ID: "td3", Target: domain.TargetRef{Kind: domain.TargetQuote, ID: "q-deleted"}},
 	}}
-	views, err := NewListTakedowns(takedowns, w.quotes, w.conversations).Execute(t.Context())
+	views, err := NewListTakedowns(takedowns, w.quotes, w.conversations, w.personas).Execute(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

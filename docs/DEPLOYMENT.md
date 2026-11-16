@@ -51,7 +51,7 @@ CI (done): [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs gofmt,
    ```sh
    npx supabase login
    npx supabase link --project-ref <ref>
-   npx supabase db push --dry-run          # should list the 3 migrations
+   npx supabase db push --dry-run          # should list the 4 migrations
    npx supabase db push --include-seed     # migrations + preset characters
    ```
 
@@ -94,6 +94,7 @@ Create one project from the GitHub repo with two services. Generate both public 
 | `ALLOWED_ORIGINS` | `https://${{web.RAILWAY_PUBLIC_DOMAIN}}`, plus the custom domain later, comma-separated |
 | `TERMS_VERSION` | the version of the terms you publish (e.g. `2026-11-01`) |
 | `PUBLIC_WORD_CAP` | `2500` |
+| `CUSTOM_CHARACTER_LIMIT` | `20` (the default): active custom characters per reader. Archived and removed characters don't count; an admin restore may exceed it. |
 
 ### `web` service
 
@@ -131,7 +132,30 @@ Create one project from the GitHub repo with two services. Generate both public 
 
 - **Schema changes**: add a migration under `supabase/migrations/`, run `npx supabase db push --dry-run` and then `db push` against production **before** merging code that needs the change. Migrations are forward-only, so take a backup first (Pro: Database → Backups).
 - **Deploys**: pushing to `main` rebuilds only the service whose watch paths changed. Turn on Railway's "Wait for CI" for both services so a red [CI](../.github/workflows/ci.yml) run never ships.
-- **Rollback**: redeploy the previous build from Railway's deployments list. A database rollback means writing a new migration. The one exception is undoing Phase 1 entirely: [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0 (read its header first; it drops moderation data and refuses to run while removed discussions exist).
+- **Rollback**: redeploy the previous build from Railway's deployments list. A database rollback means writing a new migration. Writes stay safe after a code rollback: the Phase 2 triggers keep refusing messages for archived or removed characters and removed discussions. **Reads don't.** Phase 1 code doesn't know a character can be taken down, so every discussion with a removed character comes back on public profiles. Before redeploying Phase 1 code on the Phase 2 schema, check:
+
+  ```sql
+  select count(*) from public.personas where removed_at is not null;
+  ```
+
+  If it's 0, go ahead. Otherwise either don't roll back the code, or take those discussions down too, with a marker so you can undo it later (one transaction, after a backup):
+
+  ```sql
+  update public.conversations c
+    set removed_at = now(), removed_reason = '[character removed] ' || left(p.removed_reason, 480)
+    from public.personas p
+    where p.id = c.persona_id and p.removed_at is not null and c.removed_at is null;
+  ```
+
+  When Phase 2 code is back, undo it with `update public.conversations set removed_at = null, removed_reason = '' where removed_reason like '[character removed] %';`. Restoring the character doesn't do this for you. A character taken down while Phase 1 code runs isn't possible (that code has no character takedown).
+
+  Other effects of Phase 1 code on the Phase 2 schema, all harmless: the picker lists archived and removed characters, and starting a discussion with one fails with a 500 from the trigger; character reports and takedowns appear on the admin page without content and can't be restored there.
+
+  The exception is undoing a phase entirely, with the hand-written scripts under `supabase/rollback/`, newest first and only after redeploying the matching older API and web:
+  1. [`supabase/rollback/20261116000000_phase2_custom_characters.down.sql`](../supabase/rollback/20261116000000_phase2_custom_characters.down.sql) returns the schema to Phase 1. It drops archive state, turns "depicts a living person" reports into "other", dismisses open character reports, and refuses to run while a removed character exists.
+  2. Then, optionally, [`supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql`](../supabase/rollback/20261024000000_phase1_open_to_strangers.down.sql) returns the schema to Phase 0. It drops moderation data, refuses to run while removed discussions exist, and refuses to run until the Phase 2 script has.
+
+  Read each script's header first.
 - **Config bumps**: changing `TERMS_VERSION` on `api` and redeploying makes every reader accept the terms again.
 - **Watch**: Railway logs (chi's request log, `slog` errors), the Supabase database CPU and connection count, and Anthropic spend.
 - **Secrets**: rotate the service key or Anthropic key by updating the Railway variable, which redeploys the service. Never commit `backend/.env` or `web/.env.local`.

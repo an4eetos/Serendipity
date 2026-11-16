@@ -47,6 +47,13 @@ func (r replier) answer(ctx context.Context, conversationID string, prompt domai
 		return err
 	})
 	if err != nil {
+		// The character or the discussion became unusable while the reply
+		// streamed: say so rather than a generic failure.
+		if errors.Is(err, domain.ErrCharacterArchived) ||
+			errors.Is(err, domain.ErrCharacterRemoved) ||
+			errors.Is(err, domain.ErrConversationRemoved) {
+			return domain.Message{}, err
+		}
 		return domain.Message{}, errors.Join(domain.ErrReplyNotSaved, err)
 	}
 	return m, nil

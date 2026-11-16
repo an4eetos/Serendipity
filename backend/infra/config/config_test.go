@@ -18,6 +18,7 @@ func setEnv(t *testing.T, vars map[string]*string) {
 		"PORT":                      nil,
 		"TERMS_VERSION":             nil,
 		"PUBLIC_WORD_CAP":           nil,
+		"CUSTOM_CHARACTER_LIMIT":    nil,
 	}
 	for k, v := range vars {
 		base[k] = v
@@ -96,6 +97,39 @@ func TestLoadPublicWordCap(t *testing.T) {
 			}
 			if err != nil || c.Coverage.PublicWordCap != tt.want {
 				t.Errorf("Load() = %d, %v; want %d", c.Coverage.PublicWordCap, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadCustomCharacterLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   *string
+		want    int
+		wantErr bool
+	}{
+		{"unset means the default", nil, 20, false},
+		{"empty means the default", ptr(""), 20, false},
+		{"a limit", ptr("5"), 5, false},
+		{"one character", ptr("1"), 1, false},
+		{"zero", ptr("0"), 0, true},
+		{"negative", ptr("-1"), 0, true},
+		{"fraction", ptr("2.5"), 0, true},
+		{"not a number", ptr("x"), 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnv(t, map[string]*string{"CUSTOM_CHARACTER_LIMIT": tt.value})
+			c, err := Load()
+			if tt.wantErr {
+				if err == nil || err.Error() != "CUSTOM_CHARACTER_LIMIT must be a positive whole number" {
+					t.Errorf("Load() err = %v, want the CUSTOM_CHARACTER_LIMIT error", err)
+				}
+				return
+			}
+			if err != nil || c.Characters.ActiveLimit != tt.want {
+				t.Errorf("Load() = %d, %v; want %d", c.Characters.ActiveLimit, err, tt.want)
 			}
 		})
 	}

@@ -6,6 +6,7 @@ import { ApiError, get, post } from "@/lib/api";
 import { useRequireSession } from "@/lib/auth";
 import {
   reportReasonLabels,
+  type AdminCharacter,
   type Conversation,
   type Quote,
   type ReportTargetKind,
@@ -16,7 +17,11 @@ import {
 
 const TAKEDOWN_REASON_MAX = 500;
 
-const kindLabels: Record<ReportTargetKind, string> = { quote: "Quote", conversation: "Conversation" };
+const kindLabels: Record<ReportTargetKind, string> = {
+  quote: "Quote",
+  conversation: "Conversation",
+  character: "Character",
+};
 
 function formatDate(s: string) {
   return new Date(s).toLocaleString();
@@ -101,8 +106,16 @@ function TargetHeading({ kind, ownerUsername }: { kind: ReportTargetKind; ownerU
   );
 }
 
-function TargetContent({ quote, conversation }: { quote: Quote | null; conversation: Conversation | null }) {
-  if (!quote && !conversation) return <p className="text-sm text-muted">The content is no longer available.</p>;
+function TargetContent({
+  quote,
+  conversation,
+  character,
+}: {
+  quote: Quote | null;
+  conversation: Conversation | null;
+  character: AdminCharacter | null;
+}) {
+  if (!quote && !conversation && !character) return <p className="text-sm text-muted">The content is no longer available.</p>;
   return (
     <div className="space-y-3">
       {quote && (
@@ -129,6 +142,20 @@ function TargetContent({ quote, conversation }: { quote: Quote | null; conversat
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {character && (
+        <div className="space-y-2 text-sm">
+          <p>
+            <span className="font-medium break-words">{character.name}</span>
+            {character.era && <span className="text-muted"> · {character.era}</span>}
+            <span className="text-muted"> · status: {character.status}</span>
+          </p>
+          {character.short_bio && <p className="break-words whitespace-pre-wrap">{character.short_bio}</p>}
+          <details open className="rounded-md bg-accent-soft p-3">
+            <summary className="cursor-pointer font-medium">Prompt (private)</summary>
+            <p className="mt-2 max-h-64 overflow-y-auto break-words whitespace-pre-wrap">{character.prompt}</p>
+          </details>
         </div>
       )}
     </div>
@@ -162,7 +189,7 @@ function ReportedTargetCard({ target, onDone }: { target: ReportedTarget; onDone
   return (
     <li className="card space-y-3 p-4">
       <TargetHeading kind={target.target_kind} ownerUsername={target.owner_username} />
-      <TargetContent quote={target.quote} conversation={target.conversation} />
+      <TargetContent quote={target.quote} conversation={target.conversation} character={target.character} />
 
       <div>
         <h3 className="text-sm font-medium">
@@ -226,11 +253,11 @@ function TakedownCard({ takedown, onDone }: { takedown: TakedownWithTarget; onDo
         <span className="font-medium">Removed:</span> <span className="break-words">{takedown.reason}</span>
         <span className="text-muted"> · {formatDate(takedown.created_at)}</span>
       </p>
-      <TargetContent quote={takedown.quote} conversation={takedown.conversation} />
+      <TargetContent quote={takedown.quote} conversation={takedown.conversation} character={takedown.character} />
       <div>
         {/* Without content (the owner deleted it), restoring only closes the takedown. */}
         <button className="btn" disabled={busy} onClick={restore}>
-          {takedown.quote || takedown.conversation ? "Restore" : "Close"}
+          {takedown.quote || takedown.conversation || takedown.character ? "Restore" : "Close"}
         </button>
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}

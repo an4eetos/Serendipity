@@ -29,7 +29,7 @@ func (r *ConversationRepository) Create(ctx context.Context, userID, quoteID, pe
 	err := r.db.QueryRow(ctx, `
 		insert into conversations (user_id, quote_id, persona_id)
 		values ($1, $2, $3) returning id`, userID, quoteID, personaID).Scan(&id)
-	return id, err
+	return id, characterUnavailable(err)
 }
 
 func (r *ConversationRepository) Delete(ctx context.Context, userID, id string) error {
@@ -42,7 +42,23 @@ func (r *ConversationRepository) AppendMessage(ctx context.Context, conversation
 	err := r.db.QueryRow(ctx, `
 		insert into messages (conversation_id, role, content) values ($1, $2::message_role, $3)
 		returning id, created_at`, conversationID, role, content).Scan(&m.ID, &m.CreatedAt)
-	return m, err
+	return m, characterUnavailable(err)
+}
+
+// characterUnavailable translates the insert triggers' refusals: a character
+// that is removed or archived, or a removed conversation, takes no new
+// conversation or message. Any other error is returned unchanged.
+func characterUnavailable(err error) error {
+	switch {
+	case kernelpg.IsCheckViolationOf(err, "personas_removed"):
+		return domain.ErrCharacterRemoved
+	case kernelpg.IsCheckViolationOf(err, "personas_archived"):
+		return domain.ErrCharacterArchived
+	case kernelpg.IsCheckViolationOf(err, "conversations_removed"):
+		return domain.ErrConversationRemoved
+	default:
+		return err
+	}
 }
 
 func (r *ConversationRepository) DeleteMessage(ctx context.Context, conversationID string, id int64) error {
@@ -66,7 +82,7 @@ func (r *ConversationRepository) ListForQuote(ctx context.Context, userID, quote
 }
 
 func (r *ConversationRepository) ListForQuotes(ctx context.Context, userID string, quoteIDs []string) ([]domain.Conversation, error) {
-	return r.list(ctx, `c.user_id = $1 and c.quote_id = any($2::uuid[]) and c.removed_at is null`, userID, quoteIDs)
+	return r.list(ctx, `c.user_id = $1 and c.quote_id = any($2::uuid[]) and c.removed_at is null and p.removed_at is null`, userID, quoteIDs)
 }
 
 // ListAny returns the conversations with these ids, whoever owns them.

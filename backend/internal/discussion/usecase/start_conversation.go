@@ -43,6 +43,9 @@ func (uc *StartConversation) Execute(ctx context.Context, userID, quoteID, perso
 	if err != nil {
 		return domain.Message{}, err
 	}
+	if err := persona.CheckUsable(); err != nil {
+		return domain.Message{}, err
+	}
 	var convID string
 	err = uc.txm.WithinTx(ctx, func(ctx context.Context) error {
 		var err error
