@@ -58,7 +58,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npx tsc --noEmit
+      # Next generates the PageProps / LayoutProps route types into .next/types;
+      # a fresh checkout has none, so typegen runs first.
+      - run: npm run typecheck
       - run: npm run build
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high

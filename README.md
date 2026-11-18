@@ -101,7 +101,7 @@ Reset the database (re-run migrations and seed): `npx supabase db reset`.
 
 ```sh
 cd backend && go test ./...  # domain rules, usecases with fake ports, adapters
-cd web && npm run lint && npx tsc --noEmit
+cd web && npm run lint && npm run typecheck
 ```
 
 The Postgres adapter tests run against the local Supabase database and are
